@@ -1273,7 +1273,7 @@ void R5FakeSeihai::handleIMathInst(
                     div_op2 >>= 1;
                     shift++;
                 }
-                sf.emplace_back(R5AsmStrangeFake(SRLIW, {rd, taichi1, N(shift)}));
+                sf.emplace_back(R5AsmStrangeFake(SRAIW, {rd, taichi1, N(shift)}));
                 break;
             }
         }
