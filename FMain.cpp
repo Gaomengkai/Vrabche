@@ -81,6 +81,21 @@ void frontEnd(std::istream& in, std::ostream& out, string filename = "")
     IRCtrl::g_builder->setFilename(filename);
     IRCtrl::g_builder->build(out);
 }
+void welcome()
+{
+    auto s = R"(                                                          
+                                      ,                   
+`7MM"""Yp,                     ,dMMMP'                    
+  MM    Yb                    dP                          
+  MM    dP `7MMpdMAo.  ,6"Yb. M,dW"Wb.`7MMF'`7MMF'.gP"Ya  
+  MM"""bg.   MM   `Wb 8)   MM MW'   `Wb MM    MM ,M'   Yb 
+  MM    `Y   MM    M8  ,pm9MM MM     M8 ``=.='MM 8M"""""" 
+  MM    ,9   MM   ,AP 8M   MM YA.   ,A9       MM YM.    , 
+.JMMmmmd9    MMbmmd'  `Moo9^Yo.`Ybmd9'      .JMML.`Mbmmd' 
+             MM                                           
+           .JMML.                                         )";
+    cout << s << endl;
+}
 
 void help(const string& filename = "./compiler")
 {
@@ -108,7 +123,7 @@ int main(int argc, const char** argv)
     std::string  llvmIRFileName;
     bool         emitLLVMIR = false;
     g_log_level             = MiddleIR::LOG_LEVEL_WARNING;
-
+    welcome();
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
 
@@ -183,7 +198,7 @@ int main(int argc, const char** argv)
     RISC_V_Backend(irStream, outputStream);
 
     // ------------------后端输出到outputStream----------------------
-
+    cout << "Well done." << endl;
     outputStream.close();
     return 0;
 }
