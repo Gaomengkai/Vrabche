@@ -45,6 +45,7 @@ public:
         , _ifTrue(ifTrue_)
         , _ifFalse(ifFalse_)
     {
+        if (brType_ == CondBr) { _useList.push_back(&_cond); }
     }
     BrInst(
         BrType                       brType_,
@@ -58,6 +59,7 @@ public:
         , _ifTrueLabel(std::move(ifTrueLabel_))
         , _ifFalseLabel(std::move(ifFalseLabel_))
     {
+        if (brType_ == CondBr) { _useList.push_back(&_cond); }
     }
     [[nodiscard]] const std::shared_ptr<MiddleIRVal>&        getCond() const { return _cond; }
     [[nodiscard]] const std::shared_ptr<MiddleIRBasicBlock>& getIfTrue() const { return _ifTrue; }
