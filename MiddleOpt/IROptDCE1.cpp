@@ -80,6 +80,24 @@ void IROptDCE1::run()
                 auto storeInst = std::dynamic_pointer_cast<StoreInst>(i);
                 auto to        = storeInst->getTo();
                 if (!isUseless[to]) { isUseless[i] = false; }
+                auto from = storeInst->getFrom();
+                // BFS
+                if (auto fromInst = dynamic_pointer_cast<MiddleIRInst>(from)) {
+                    std::queue<SPInst> q;
+                    q.push(fromInst);
+                    while (!q.empty()) {
+                        auto cur = q.front();
+                        q.pop();
+                        for (auto& used : cur->getUseList()) {
+                            if (isUseless[*used]) {
+                                isUseless[*used] = false;
+                                if (auto usedInst = dynamic_pointer_cast<MiddleIRInst>(*used)) {
+                                    q.push(usedInst);
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
