@@ -96,8 +96,8 @@ inline shared_ptr<CVal>& getValInACArrRef(
     const shared_ptr<CArr>& arr_, const std::deque<size_t>& pos, const std::deque<size_t>& shape
 )
 {
-    shared_ptr<CArr> arr = arr_;
-    auto subArrShape     = shape;
+    shared_ptr<CArr> arr         = arr_;
+    auto             subArrShape = shape;
     // init for first to last-1 dim. because last-1 is CVal not CArr.
     for (auto p = 0; p < pos.size() - 1; p++) {
         // init
@@ -395,10 +395,10 @@ void Utils::ZeroInitCArr(const shared_ptr<CArr>& vArr)
         } else if (w == CArr::ZERO) {
 
         } else if (w == CArr::CVAL) {
-            if (DPC(IntCVal, vArr->_childVals[i])->iVal == 0) {
-                vArr->_childVals[i] = nullptr;
-                vArr->witch[i]      = CArr::ZERO;
-            } else if (DPC(FloatCVal, vArr->_childVals[i])->fVal == 0) {
+            if ((vArr->containedType == IRValType::Int &&
+                 DPC(IntCVal, vArr->_childVals[i])->iVal == 0) ||
+                (vArr->containedType == IRValType::Float &&
+                 DPC(FloatCVal, vArr->_childVals[i])->fVal == 0)) {
                 vArr->_childVals[i] = nullptr;
                 vArr->witch[i]      = CArr::ZERO;
             } else {
