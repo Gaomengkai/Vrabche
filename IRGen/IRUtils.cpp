@@ -235,7 +235,9 @@ std::shared_ptr<CArr> Utils::buildAnCArrFromInitList(
     auto g     = CArrGenerator(rr, shape, iList);
     g.gen();
     rr->advancedType = MS<ArrayType>(rr->containedType, vector<size_t>(shape.begin(), shape.end()));
-    return g.arr;
+    auto arr         = g.arr;
+    ZeroInitCArr(arr);
+    return arr;
 }
 std::shared_ptr<VArr> Utils::buildAnVArrFromInitList(
     const shared_ptr<InitListVal>& iList, const std::deque<size_t>& shape
@@ -260,7 +262,7 @@ string Utils::valTypeToStr(IRValType _t)
     case IRValType::Bool: return "i1";
     case IRValType::Unknown: return "ERROR";
     }
-    RUNTIME_ERROR("Unknown IRValType"<<(int)_t);
+    RUNTIME_ERROR("Unknown IRValType" << (int)_t);
 }
 
 string Utils::floatTo64BitStr(float x)
@@ -296,7 +298,7 @@ std::tuple<size_t, int, float> Utils::parseCVal(const shared_ptr<CVal>& cVal)
 string Utils::localConstName(const string& functionName, const string& idName)
 {
     static int id = 0;
-    return "__const."+std::to_string(id++)+"." + functionName + "." + idName;
+    return "__const." + std::to_string(id++) + "." + functionName + "." + idName;
 }
 
 /// \brief Get string representation of a icmp operator
@@ -306,44 +308,43 @@ string Utils::icmpOpToStr(ICMPOp _op)
 {
     // enum class ICMPOp {EQ, NE, UGT, UGE, ULT, ULE, SGT, SGE, SLT, SLE};
     switch (_op) {
-        case ICMPOp::EQ: return "eq";
-        case ICMPOp::NE: return "ne";
-        case ICMPOp::UGT: return "ugt";
-        case ICMPOp::UGE: return "uge";
-        case ICMPOp::ULT: return "ult";
-        case ICMPOp::ULE: return "ule";
-        case ICMPOp::SGT: return "sgt";
-        case ICMPOp::SGE: return "sge";
-        case ICMPOp::SLT: return "slt";
-        case ICMPOp::SLE: return "sle";
+    case ICMPOp::EQ: return "eq";
+    case ICMPOp::NE: return "ne";
+    case ICMPOp::UGT: return "ugt";
+    case ICMPOp::UGE: return "uge";
+    case ICMPOp::ULT: return "ult";
+    case ICMPOp::ULE: return "ule";
+    case ICMPOp::SGT: return "sgt";
+    case ICMPOp::SGE: return "sge";
+    case ICMPOp::SLT: return "slt";
+    case ICMPOp::SLE: return "sle";
     }
     throw std::runtime_error("Unknown icmp operator");
 }
 
-/// enum class FCMPOp { False, OEQ, OGT, OGE, OLT, OLE, ONE, ORD, UEQ, UGT, UGE, ULT, ULE, UNE, UNO, True };
-/// \param _op
-/// \return Just as you expected
+/// enum class FCMPOp { False, OEQ, OGT, OGE, OLT, OLE, ONE, ORD, UEQ, UGT, UGE, ULT, ULE, UNE, UNO,
+/// True }; \param _op \return Just as you expected
 string Utils::fcmpOpToStr(FCMPOp _op)
 {
     switch (_op) {
-        case FCMPOp::False: return "false";
-        case FCMPOp::OEQ: return "oeq";
-        case FCMPOp::OGT: return "ogt";
-        case FCMPOp::OGE: return "oge";
-        case FCMPOp::OLT: return "olt";
-        case FCMPOp::OLE: return "ole";
-        case FCMPOp::ONE: return "one";
-        case FCMPOp::ORD: return "ord";
-        case FCMPOp::UEQ: return "ueq";
-        case FCMPOp::UGT: return "ugt";
-        case FCMPOp::UGE: return "uge";
-        case FCMPOp::ULT: return "ult";
-        case FCMPOp::ULE: return "ule";
-        case FCMPOp::UNE: return "une";
-        case FCMPOp::UNO: return "uno";
-        case FCMPOp::True: return "true";
+    case FCMPOp::False: return "false";
+    case FCMPOp::OEQ: return "oeq";
+    case FCMPOp::OGT: return "ogt";
+    case FCMPOp::OGE: return "oge";
+    case FCMPOp::OLT: return "olt";
+    case FCMPOp::OLE: return "ole";
+    case FCMPOp::ONE: return "one";
+    case FCMPOp::ORD: return "ord";
+    case FCMPOp::UEQ: return "ueq";
+    case FCMPOp::UGT: return "ugt";
+    case FCMPOp::UGE: return "uge";
+    case FCMPOp::ULT: return "ult";
+    case FCMPOp::ULE: return "ule";
+    case FCMPOp::UNE: return "une";
+    case FCMPOp::UNO: return "uno";
+    case FCMPOp::True: return "true";
     }
-    RUNTIME_ERROR("Unknown fcmp operator"<<(int)_op);
+    RUNTIME_ERROR("Unknown fcmp operator" << (int)_op);
 }
 
 
@@ -383,4 +384,29 @@ float Utils::FLOP(T1 v1, T2 v2, IRValOp op)
     }
     return 0;
 }
+void Utils::ZeroInitCArr(const shared_ptr<CArr>& vArr)
+{
+    for (auto i = 0; i < vArr->witch.size(); i++) {
+        auto w      = vArr->witch[i];
+        bool isZero = true;
+        if (w == CArr::CARR) {
+            ZeroInitCArr(vArr->_childArrs[i]);
+            if (!vArr->_childArrs[i]->isZero) { isZero = false; }
+        } else if (w == CArr::ZERO) {
+
+        } else if (w == CArr::CVAL) {
+            if (DPC(IntCVal, vArr->_childVals[i])->iVal == 0) {
+                vArr->_childVals[i] = nullptr;
+                vArr->witch[i]      = CArr::ZERO;
+            } else if (DPC(FloatCVal, vArr->_childVals[i])->fVal == 0) {
+                vArr->_childVals[i] = nullptr;
+                vArr->witch[i]      = CArr::ZERO;
+            } else {
+                isZero = false;
+            }
+        }
+        vArr->isZero = isZero;
+    }
+}
+
 }   // namespace IRCtrl
