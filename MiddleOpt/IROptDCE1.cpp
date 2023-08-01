@@ -34,6 +34,7 @@ void IROptDCE1::run()
         // 无用变量分析（指通过alloca创建的变量）
         // （副作用逆向覆盖，没有被覆盖的变量就是无用变量）
         std::list<SPVal> sideEffect;
+        sideEffect.emplace_back(bb->getTerminator());
         for (auto& i : bb->_instructions) {
             // call, 全局变量存储, 返回指令都有副作用（或修改值，或修改内存，或终结函数）
             if (i->isCallInst() || i->isReturnInst()) {
