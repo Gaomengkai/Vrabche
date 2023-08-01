@@ -194,14 +194,14 @@ YangReg R5RegDispatcher::getReservedIReg(int index)
 {
     if(index<1) index=1;
     if(index>3) index=3;
-    return (YangReg)(s10+index-1);
+    return (YangReg)(s9+index-1);
 }
 
 YangReg R5RegDispatcher::getReservedFReg(int index)
 {
     if(index<1) index=1;
     if(index>3) index=3;
-    return (YangReg)(fs10+index-1);
+    return (YangReg)(fs9+index-1);
 }
 
 bool R5RegDispatcher::isFloat(YangReg r)
