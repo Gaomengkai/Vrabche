@@ -80,6 +80,7 @@ void IROptDCE1::run()
                 auto storeInst = std::dynamic_pointer_cast<StoreInst>(i);
                 auto to        = storeInst->getTo();
                 if (isUseless[to]) continue;
+                isUseless[i] = false;
                 auto from = storeInst->getFrom();
                 isUseless[from] = false;
                 // BFS
