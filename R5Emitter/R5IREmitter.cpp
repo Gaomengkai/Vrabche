@@ -70,7 +70,7 @@ void R5IREmitter::build(std::ostream& os)
                 }
                 os << idName << ":" << endl;
                 for (auto& i : c) {
-                    if (i.data.empty()) {
+                    if (i.data.empty() && i.zeroBytes != 0) {
                         os << tab << ".zero " << i.zeroBytes << endl;
                     } else {
                         for (auto& j : i.data) {
@@ -97,7 +97,7 @@ void R5IREmitter::build(std::ostream& os)
                 }
                 os << idName << ":" << endl;
                 for (auto& i : c) {
-                    if (i.data.empty()) {
+                    if (i.data.empty() && i.zeroBytes != 0) {
                         os << tab << ".zero " << i.zeroBytes << endl;
                     } else {
                         for (auto j : i.data) {

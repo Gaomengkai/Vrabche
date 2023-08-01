@@ -43,6 +43,8 @@ public:
     /// \return
     static std::tuple<size_t, int, float> parseCVal(const shared_ptr<CVal>& cVal);
 
+    static void ZeroInitCArr(const shared_ptr<CArr>& vArr);
+
 
 
 
