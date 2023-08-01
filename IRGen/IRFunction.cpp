@@ -6,6 +6,7 @@
 #include "IRUtils.h"
 #include "IRLogger.h"
 #include "IRGlobal.h"
+#include <list>
 namespace IRCtrl
 {
 string IRFunction::toString()
@@ -91,8 +92,17 @@ string IRFunction::toString()
     for(auto& b : bbs) {
         if(b->name=="LEntry") {
             // 3. insert all the alloca to LEntry block.
-            for(auto t=allocas.rbegin();t!=allocas.rend();t++) {
-                b->instructions.insert(b->instructions.begin(), std::move(*t));
+            std::list<UPLocalSen> entryInstructions;
+            for(auto & t : allocas) {
+                entryInstructions.emplace_back(std::move(t));
+            }
+            for(auto &nt:b->instructions) {
+                entryInstructions.emplace_back(std::move(nt));
+            }
+            b->instructions.clear();
+            b->instructions.resize(entryInstructions.size());
+            for(auto &ct:entryInstructions){
+                b->instructions.emplace_back(std::move(ct));
             }
             break;
         }
