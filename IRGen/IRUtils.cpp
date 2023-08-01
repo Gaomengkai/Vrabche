@@ -386,9 +386,9 @@ float Utils::FLOP(T1 v1, T2 v2, IRValOp op)
 }
 void Utils::ZeroInitCArr(const shared_ptr<CArr>& vArr)
 {
+    bool isZero = true;
     for (auto i = 0; i < vArr->witch.size(); i++) {
         auto w      = vArr->witch[i];
-        bool isZero = true;
         if (w == CArr::CARR) {
             ZeroInitCArr(vArr->_childArrs[i]);
             if (!vArr->_childArrs[i]->isZero) { isZero = false; }
@@ -396,9 +396,9 @@ void Utils::ZeroInitCArr(const shared_ptr<CArr>& vArr)
 
         } else if (w == CArr::CVAL) {
             if ((vArr->containedType == IRValType::Int &&
-                 DPC(IntCVal, vArr->_childVals[i])->iVal == 0) ||
+                 (DPC(IntCVal, vArr->_childVals[i])->iVal == 0)) ||
                 (vArr->containedType == IRValType::Float &&
-                 DPC(FloatCVal, vArr->_childVals[i])->fVal == 0)) {
+                 (DPC(FloatCVal, vArr->_childVals[i])->fVal == 0))) {
                 vArr->_childVals[i] = nullptr;
                 vArr->witch[i]      = CArr::ZERO;
             } else {
