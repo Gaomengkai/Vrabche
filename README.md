@@ -26,7 +26,7 @@ make -j8
 ### Use the compiler
 
 ```bash
-./Vrabche -S <SourceFilePath> [-O1|-O2|-O0] [-arm] [-dso] -o <OutputFilePath>
+./Vrabche -S <SourceFilePath> [-O1|-O2|-O0] [-arm] [-dso] -o <OutputFilePath> [-save-llvm <OutputLLVMIRPath>]
 ```
 
 Explanation:
