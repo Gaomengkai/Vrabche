@@ -171,11 +171,11 @@ void R5RegAllocator::doAllocate(int bbIndex)
         ls.ls = newL;
     }
     // 打印结果。
-    for (auto& [name, ls] : lifespan) {
-        std::cout << name << ": ";
-        for (auto& [birth, death] : ls.ls) { std::cout << "(" << birth << "," << death << ") "; }
-        std::cout << std::endl;
-    }
+    // for (auto& [name, ls] : lifespan) {
+    //     std::cout << name << ": ";
+    //     for (auto& [birth, death] : ls.ls) { std::cout << "(" << birth << "," << death << ") "; }
+    //     std::cout << std::endl;
+    // }
 
     // 构建结束。
     // 数据还算比较密集，可以使用一个数组来记录每一位置的指令对应的寄存器分配和释放情况。

@@ -12,7 +12,7 @@
 #ifndef _DEBUG
 #    define _DEBUG
 #endif
-
+#include "R5Logger.h"
 #ifndef SYSY_LOGGER
 
 namespace IRCtrl

@@ -2,7 +2,7 @@
 // Created by gao on 6/28/23.
 //
 #include "IRLogger.h"
-
+#ifndef SYSY_LOGGER
 namespace IRCtrl
 {
 static auto   debug_null_out = std::ostream(nullptr);
@@ -16,3 +16,4 @@ std::ostream& sysyDebug(LOG_LEVEL level)
     }
 }
 }   // namespace IRCtrl
+#endif

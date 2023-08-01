@@ -82,12 +82,32 @@ void frontEnd(std::istream& in, std::ostream& out, string filename = "")
     IRCtrl::g_builder->build(out);
 }
 
+void help(const string& filename = "./compiler")
+{
+    cout << "Usage: " << filename << " [options] <input file>" << endl;
+    cout << "Options:" << endl;
+    cout << "  -o <output file>  Specify output filename" << endl;
+    cout << "  -O0               Disable optimization" << endl;
+    cout << "  -O1               Enable optimization level 1" << endl;
+    cout << "  -O2               Enable optimization level 2" << endl;
+    cout << "  -S                Emit LLVM-IR instead of RISC-V assembly" << endl;
+    cout << "  -arm              Enable ARM AAPCS-VFPCC calling convention" << endl;
+    cout << "  -dso              Enable DSO local" << endl;
+    cout << "  -debug            Enable debug log" << endl;
+    cout << "  -save-llvm <file> Save LLVM-IR to file" << endl;
+    cout << "  -h, --help        Show this help message" << endl;
+    exit(0);
+}
+
 int main(int argc, const char** argv)
 {
     std::string  inputFileName;
     std::string  outputFileName;
     std::string  optimizationLevel;
     stringstream irStream;
+    std::string  llvmIRFileName;
+    bool         emitLLVMIR = false;
+    g_log_level             = MiddleIR::LOG_LEVEL_WARNING;
 
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
@@ -108,6 +128,19 @@ int main(int argc, const char** argv)
             IRCtrl::IR_SWITCH_ENABLE_ARM_AAPCS_VFPCC = true;
         } else if (arg == "-dso") {
             IRCtrl::IR_SWITCH_ENABLE_DSO_LOCAL = true;
+        } else if (arg == "-debug") {
+            g_log_level = MiddleIR::LOG_LEVEL_DEBUG;
+        } else if (arg == "-save-llvm") {
+            if (i + 1 < argc) {
+                llvmIRFileName = argv[i + 1];
+                emitLLVMIR     = true;
+                ++i;
+            } else {
+                LOGE("No LLVM-IR output filename" << std::endl);
+                return 1;
+            }
+        } else if (arg == "-h" || arg == "--help") {
+            help(argv[0]);
         } else {
             inputFileName = arg;
         }
@@ -135,7 +168,16 @@ int main(int argc, const char** argv)
     frontEnd(inputStream, irStream, inputFileName);
 
     // ---------------前端结果输出到了irStream中----------------------
-
+    if (emitLLVMIR) {
+        std::ofstream llvmIROutputStream;
+        llvmIROutputStream.open(llvmIRFileName, std::ios::out);
+        if (!llvmIROutputStream) {
+            LOGE("no such llvmIROutputStream" << endl);
+            return 1;
+        }
+        llvmIROutputStream << irStream.str();
+        llvmIROutputStream.close();
+    }
     // -------------------------后端--------------------------------
 
     RISC_V_Backend(irStream, outputStream);
