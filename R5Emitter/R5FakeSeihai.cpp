@@ -1264,6 +1264,19 @@ void R5FakeSeihai::handleIMathInst(
     } break;
 
     case IMathInst::IMathOp::SDIV: {
+        // 专为除以2的幂优化
+        if(taichi1->isYin() && taichi2->isLai()) {
+            auto div_op2 = dynamic_pointer_cast<R5Lai>(taichi2)->value;
+            if (div_op2 > 0 && (div_op2 & (div_op2 - 1)) == 0) {
+                int shift = 0;
+                while (div_op2 > 1) {
+                    div_op2 >>= 1;
+                    shift++;
+                }
+                sf.emplace_back(R5AsmStrangeFake(SRAIW, {rd, taichi1, N(shift)}));
+                break;
+            }
+        }
         // 除法要求两个操作数都是寄存器
         // 不是的话，就要先把立即数装载到寄存器里
         if (taichi1->isLai()) {

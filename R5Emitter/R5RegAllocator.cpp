@@ -361,8 +361,8 @@ void R5RegAllocator::doAllocate(int bbIndex)
                 if (int64_t offset = dispatcher.queryStackOffset(name); offset != -1) {
                     // 通过加载指令，将内存中的值加载到寄存器中。
                     spillSaveCount+=1;
-                    auto reservedR2 = vr->isFloat() ? dispatcher.getReservedFReg(spillSaveCount)
-                                                    : dispatcher.getReservedIReg(spillSaveCount);
+                    auto reservedR2 = vr->isFloat() ? dispatcher.getReservedFReg(spillSaveCount++)
+                                                    : dispatcher.getReservedIReg(spillSaveCount++);
                     auto tmpReg     = dispatcher.getReservedIReg(spillSaveCount);
                     if (vr->isFloat()) {
                         accessStackWithTmp(spillWriteBackFutureInst, FSW, reservedR2, offset, s0, tmpReg);
