@@ -1,0 +1,50 @@
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# CMake build directory
+build/
+
+# CLion files
+.cmake/
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+cmake-build-*/
+
+# Miscellaneous
+.vscode/
+*.swp
+*~
+.DS_Store
+
+# antlr
+.antlr/
+.cache/
+
+# test
+testsrc/
