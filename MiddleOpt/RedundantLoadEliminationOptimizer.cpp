@@ -8,8 +8,12 @@ namespace MiddleIR::Optimizer
 {
 void RedundantLoadEliminationOptimizer::run()
 {
+    decltype(g_log_level) old_level = g_log_level;
+    g_log_level                      = LOG_LEVEL::LOG_LEVEL_DEBUG;
     for (auto& func : _irast->funcDefs) {
+        LOGD("Enter Function "<<func->getName());
         for (auto& bb : func->getBasicBlocks()) {
+            LOGD("Enter BasicBlock "<<bb->getName());
             // round 1: find first load from
             std::set<shared_ptr<MiddleIRVal>> loadFrom;
             std::unordered_map<shared_ptr<MiddleIRVal>, shared_ptr<MiddleIRInst>>
@@ -60,10 +64,14 @@ void RedundantLoadEliminationOptimizer::run()
             decltype(bb->_instructions) newInstList;
             for (auto& inst : bb->_instructions) {
                 if (!inst->isDeleted()) { newInstList.push_back(inst); }
+                else {
+                    std::cout << "delete inst: " << inst->getName() <<  std::endl;
+                }
             }
             bb->_instructions = newInstList;
         }
     }
+    g_log_level = old_level;
 }
 
 }   // namespace MiddleIR
