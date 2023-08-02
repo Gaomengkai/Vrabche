@@ -43,6 +43,8 @@ using tree::TerminalNode;
 using namespace MiddleIR;
 using MiddleIR::Optimizer::IROptimizer;
 
+std::string optimizationLevel;
+
 void RISC_V_Backend(std::istream& in, std::ostream& out)
 {
     // parse IR AST
@@ -55,9 +57,13 @@ void RISC_V_Backend(std::istream& in, std::ostream& out)
     tree->accept(visitor);
 
     // Optimizer
-    auto        irAST       = visitor->getAST();
-    auto        SPCopiedAST = make_shared<MiddleIRAST>(irAST);
-    uint64_t    opt         = IROptimizer::NONE_OPTIMIZATION;
+    auto     irAST       = visitor->getAST();
+    auto     SPCopiedAST = make_shared<MiddleIRAST>(irAST);
+    uint64_t opt;
+    if (!optimizationLevel.empty()) {
+        opt = IROptimizer::DEAD_CODE_ELIMINATION;
+    } else
+        opt = IROptimizer::O0;
     IROptimizer optimizer(SPCopiedAST, static_cast<IROptimizer::ENABLED_OPT>(opt));
     optimizer.run();
 
@@ -118,7 +124,6 @@ int main(int argc, const char** argv)
 {
     std::string  inputFileName;
     std::string  outputFileName;
-    std::string  optimizationLevel;
     stringstream irStream;
     std::string  llvmIRFileName;
     bool         emitLLVMIR = false;
