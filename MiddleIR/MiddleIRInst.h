@@ -282,6 +282,7 @@ public:
         , _to(std::move(to_))
     {
         _useList.emplace_back(&_from);
+        _useList.emplace_back(&_to);
     }
     [[nodiscard]] const std::shared_ptr<MiddleIRVal>& getOpVal1() const { return _from; }
     [[nodiscard]] const std::shared_ptr<MiddleIRVal>& getOpVal2() const { return _to; }
