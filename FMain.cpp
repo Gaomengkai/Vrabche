@@ -61,7 +61,7 @@ void RISC_V_Backend(std::istream& in, std::ostream& out)
     auto     SPCopiedAST = make_shared<MiddleIRAST>(irAST);
     uint64_t opt;
     if (!optimizationLevel.empty()) {
-        opt = IROptimizer::DEAD_CODE_ELIMINATION;
+        opt = IROptimizer::CAFP | IROptimizer::CSLR | IROptimizer::DEAD_CODE_ELIMINATION;
     } else
         opt = IROptimizer::O0;
     IROptimizer optimizer(SPCopiedAST, static_cast<IROptimizer::ENABLED_OPT>(opt));

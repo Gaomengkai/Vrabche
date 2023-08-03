@@ -15,6 +15,7 @@ public:
     explicit IROptInline(shared_ptr<MiddleIR::MiddleIRAST> irast);
     ~IROptInline() override = default;
     void run() override;
+    void inlineFunc(const shared_ptr<MiddleIRFuncDef>& f);
 };
 
 } // namespace MiddleIR::Optimizer

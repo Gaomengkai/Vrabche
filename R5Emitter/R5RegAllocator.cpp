@@ -73,7 +73,7 @@ R5RegAllocator::R5RegAllocator(
 void R5RegAllocator::doAllocate()
 {
     for (int i = 0; i < bbCodes.size(); i++) {
-        LOGW("Allocating %s" << bbNames[i]);
+        LOGD("Allocating %s" << bbNames[i]);
         doAllocate(i);
     }
 }
