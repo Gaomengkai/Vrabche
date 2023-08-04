@@ -63,6 +63,7 @@ protected:
     // 获取那个函数的寄存器使用情况
     std::set<YangReg> getUsedRegs(string funcName);
     std::unordered_map<string, YangReg> buildArgRegMap();
+    std::unordered_map<string, int64_t> buildExtArgRegMap();
 };
 
 }   // namespace R5Emitter

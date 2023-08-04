@@ -188,6 +188,9 @@ YangReg R5RegDispatcher::allocateHard(const string& vName, YangReg r)
 }
 int64_t R5RegDispatcher::queryStackOffset(const string& vName)
 {
+    if(auto it = extArgStackOffset.find(vName);it!=extArgStackOffset.end()) {
+        return it->second;
+    }
     return taichiMap.query(preTaichi(vName));
 }
 int64_t R5RegDispatcher::allocateStack(const string& vName, int64_t sz)
@@ -234,6 +237,9 @@ string R5RegDispatcher::preTaichi(const string& vName)
 const std::set<YangReg>& R5RegDispatcher::getTotalUsedRegs() const
 {
     return totalUsedRegs;
+}
+void R5RegDispatcher::allocateHardOffset(const string& vName, int64_t offset) {
+    extArgStackOffset[vName] = offset;
 }
 
 }   // namespace R5Emitter
