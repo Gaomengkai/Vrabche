@@ -3,7 +3,7 @@
 //
 
 #include "IROptRLE.h"
-
+#include "IROptCF.h"
 namespace MiddleIR::Optimizer
 {
 template<typename T>
@@ -68,6 +68,8 @@ void IROptRLE::run()
                     ++it;
                 }
             }
+            // CF
+            IROptCF::ConstFold(bb);
         }
     }
     g_log_level = old_level;

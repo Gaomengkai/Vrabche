@@ -13,7 +13,6 @@ namespace MiddleIR::Optimizer
 class IROptRLE : public IROptimizerBase
 {
 public:
-    [[deprecated("This optimizer has bugs, please don't use it!")]]
     explicit IROptRLE(const shared_ptr<MiddleIRAST>& irast_)
         : IROptimizerBase(irast_)
     {
