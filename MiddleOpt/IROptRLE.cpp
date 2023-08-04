@@ -70,6 +70,7 @@ void IROptRLE::run()
             }
             // CF
             IROptCF::ConstFold(bb);
+            // end
         }
     }
     g_log_level = old_level;

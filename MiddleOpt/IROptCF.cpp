@@ -65,11 +65,11 @@ void IROptCF::ConstFold(const shared_ptr<MiddleIRBasicBlock>& bb)
                 i->setDeleted();
             }
         }
+        // replace
         for (const auto& i : bb->_instructions) {
             for (auto& u : i->getUseList()) {
                 if (mapConstReplace.find(*u) != mapConstReplace.end()) {
                     i->tryReplaceUse(*u, mapConstReplace[*u]);
-                    break;
                 }
             }
         }
@@ -77,11 +77,9 @@ void IROptCF::ConstFold(const shared_ptr<MiddleIRBasicBlock>& bb)
         for (auto& u : ter->getUseList()) {
             if (mapConstReplace.find(*u) != mapConstReplace.end()) {
                 ter->tryReplaceUse(*u, mapConstReplace[*u]);
-                break;
             }
         }
     } while (!mapConstReplace.empty());
-    // 6th pass: truly delete deleted inst
     for (auto it1 = bb->_instructions.begin(); it1 != bb->_instructions.end();) {
         if ((*it1)->isDeleted()) {
             it1 = bb->_instructions.erase(it1);
