@@ -16,7 +16,7 @@ using SP = shared_ptr<T>;
 namespace MiddleIR::Optimizer
 {
 
-void IROptCF::ConstFold(const shared_ptr<MiddleIRBasicBlock>& bb)
+bool IROptCF::ConstFold(const shared_ptr<MiddleIRBasicBlock>& bb)
 {
     std::map<SP<MiddleIRVal>, SP<MiddleIRVal>> mapConstReplace;
     do {
@@ -80,12 +80,15 @@ void IROptCF::ConstFold(const shared_ptr<MiddleIRBasicBlock>& bb)
             }
         }
     } while (!mapConstReplace.empty());
+    bool hasChanged = false;
     for (auto it1 = bb->_instructions.begin(); it1 != bb->_instructions.end();) {
         if ((*it1)->isDeleted()) {
             it1 = bb->_instructions.erase(it1);
+            hasChanged = true;
         } else {
             ++it1;
         }
     }
+    return hasChanged;
 }
 }   // namespace MiddleIR::Optimizer

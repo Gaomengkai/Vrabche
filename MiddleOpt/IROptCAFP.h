@@ -17,6 +17,9 @@ public:
     explicit IROptCAFP(const shared_ptr<MiddleIRAST>& irast);
     void run() override;
     ~IROptCAFP() override = default;
+
+private:
+    bool powerOff = false;
 };
 
 }   // namespace Optimizer

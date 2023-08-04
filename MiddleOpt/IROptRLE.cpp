@@ -10,12 +10,9 @@ template<typename T>
 using SP = shared_ptr<T>;
 void IROptRLE::run()
 {
-    decltype(g_log_level) old_level = g_log_level;
-    g_log_level                     = LOG_LEVEL::LOG_LEVEL_DEBUG;
+    hasChanged = false;
     for (auto& func : _irast->funcDefs) {
-        LOGD("Enter Function " << func->getName());
         for (auto& bb : func->getBasicBlocks()) {
-            LOGD("Enter BasicBlock " << bb->getName());
             std::unordered_map<SP<AllocaInst>, SP<MiddleIRVal>>            map1;
             std::unordered_map<SP<AllocaInst>, std::list<SP<MiddleIRVal>>> map2;
             std::unordered_map<SP<MiddleIRVal>, SP<MiddleIRVal>>           map3;
@@ -40,10 +37,10 @@ void IROptRLE::run()
                     }
                     if (auto storeInst = DPC(StoreInst, i)) {
                         auto from = storeInst->getFrom();
-                        if(from->getName().size()>5 && from->getName().substr(0,5)=="%arg_"){
+                        if (from->getName().size() > 5 && from->getName().substr(0, 5) == "%arg_") {
                             continue;
                         }
-                        auto to   = storeInst->getTo();
+                        auto to = storeInst->getTo();
                         if (auto toAlloca = DPC(AllocaInst, to)) {
                             if (auto it1 = map1.find(toAlloca); it1 != map1.end()) {
                                 for (const auto& k1 : map2[toAlloca]) { map3.erase(k1); }
@@ -63,17 +60,18 @@ void IROptRLE::run()
             // delete
             for (auto it = bb->_instructions.begin(); it != bb->_instructions.end();) {
                 if ((*it)->isDeleted()) {
-                    it = bb->_instructions.erase(it);
+                    hasChanged = true;
+                    it         = bb->_instructions.erase(it);
                 } else {
                     ++it;
                 }
             }
             // CF
-            IROptCF::ConstFold(bb);
+            hasChanged |= IROptCF::ConstFold(bb);
             // end
         }
     }
-    g_log_level = old_level;
+    LOGW("RLE Done");
 }
 
 }   // namespace MiddleIR::Optimizer

@@ -40,6 +40,10 @@ R5IRValConstEq(const shared_ptr<R5IRValConst>& v1, const shared_ptr<R5IRValConst
 }
 void IROptCAFP::run()
 {
+    if (powerOff) {
+        hasChanged = false;
+        return;
+    }
     unordered_map<string, vector<shared_ptr<R5IRValConst>>> mapFnNameToConstArgs;
     std::unordered_set<string>                              setFnNameIgnored;
     for (const auto& f : _irast->funcDefs) {
@@ -112,7 +116,9 @@ void IROptCAFP::run()
             }
         }
     }
+    hasChanged = true;
+    powerOff   = true;
     // end
-    LOGD("IROptCAFP done");
+    LOGW("CAFP done");
 }
 }   // namespace MiddleIR::Optimizer

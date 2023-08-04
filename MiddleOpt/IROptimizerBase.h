@@ -19,6 +19,7 @@ public:
     explicit IROptimizerBase(shared_ptr<MiddleIRAST> irast)
         : _irast(std::move(irast)){};
     virtual void run() = 0;
+    bool         hasChanged = false;
 
 protected:
     shared_ptr<MiddleIRAST> _irast;

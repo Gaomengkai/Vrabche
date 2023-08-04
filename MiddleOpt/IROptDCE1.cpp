@@ -19,6 +19,7 @@ void IROptDCE1::run()
     // 这个优化仅仅针对于一个函数只有一个基本块的情况
     // 以后再考虑多个基本块的情况
     // 也就是说，这个优化仅仅针对于没有跳转的情况
+    hasChanged = false;
     for (auto& func : _irast->funcDefs) {
         if (func->getBasicBlocks().size() > 1) { continue; }
         IR_ASSERT(func->getBasicBlocks().size() == 1, "A Func Must Have At Least One BasicBlock");
@@ -116,6 +117,7 @@ void IROptDCE1::run()
         for (auto& inst : bb->_instructions) {
             if (isUseless[inst]) {
                 inst->setDeleted(true);
+                hasChanged = true;
                 std::cout << "del ";
                 if (auto store = dynamic_pointer_cast<StoreInst>(inst)) {
                     std::cout << "store " << store->getFrom()->getName() << "->"
@@ -129,5 +131,6 @@ void IROptDCE1::run()
         // 结果：
         std::cout << bb->_instructions.size() << std::endl;
     }
+    LOGW("DCE1 Done");
 }
 }   // namespace MiddleIR::Optimizer

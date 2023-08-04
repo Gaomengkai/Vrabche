@@ -13,7 +13,7 @@ namespace MiddleIR::Optimizer
 class IROptCF
 {
 public:
-    static void ConstFold(const shared_ptr<MiddleIRBasicBlock>& bb);
+    static bool ConstFold(const shared_ptr<MiddleIRBasicBlock>& bb);
 };
 
 }   // namespace MiddleIR::Optimizer

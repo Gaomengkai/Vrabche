@@ -22,15 +22,15 @@ public:
         CONSTANT_FOLDING                 = 0x1,
         CONSTANT_PROPAGATION             = 0x2,
         COPY_PROPAGATION                 = 0x4,
-        DEAD_CODE_ELIMINATION            = 0x8,
+        OPT_DCE                          = 0x8,
         COMMON_SUBEXPRESSION_ELIMINATION = 0x10,
         LOOP_OPTIMIZATION                = 0x20,
         FUNCTION_INLINE                  = 0x40,
         NONE_OPTIMIZATION                = 0x80,
-        REDUNDANT_LOAD_ELIMINATION       = 0x100,
+        OPT_RLE                          = 0x100,
         INSTRUCTION_COMBINE              = 0x200,
-        CAFP                             = 0x400,
-        CSLR                             = 0x800,
+        OPT_CAFP                         = 0x400,
+        OPT_CSLR                         = 0x800,
         ALL                              = (uint64_t)-1
     } enabledOpt           = O0;
     virtual ~IROptimizer() = default;
@@ -38,18 +38,21 @@ public:
         : _irast(irast_)
         , enabledOpt(enabledOpt_)
     {
-        //        if (NONE_OPTIMIZATION & enabledOpt) { _optimizers.push_back(new
-        //        NoneOptimizer(irast_)); }
-        if (REDUNDANT_LOAD_ELIMINATION & enabledOpt) {
-            _optimizers.push_back(new IROptRLE(irast_));
-        }
-        if (DEAD_CODE_ELIMINATION & enabledOpt) { _optimizers.push_back(new IROptDCE1(irast_)); }
-        if (CAFP & enabledOpt) { _optimizers.push_back(new IROptCAFP(irast_)); }
-        if (CSLR & enabledOpt) { _optimizers.push_back(new IROptCSLR(irast_)); }
+        if (OPT_RLE & enabledOpt) { _optimizers.push_back(new IROptRLE(irast_)); }
+        if (OPT_DCE & enabledOpt) { _optimizers.push_back(new IROptDCE1(irast_)); }
+        if (OPT_CAFP & enabledOpt) { _optimizers.push_back(new IROptCAFP(irast_)); }
+        //        if (OPT_CSLR & enabledOpt) { _optimizers.push_back(new IROptCSLR(irast_)); }
     }
     virtual void run()
     {
-        for (auto& optimizer : _optimizers) { optimizer->run(); }
+        bool hasChanged = false;
+        do {
+            hasChanged = false;
+            for (auto& optimizer : _optimizers) {
+                optimizer->run();
+                hasChanged |= optimizer->hasChanged;
+            }
+        } while (hasChanged);
     }
 
 protected:
