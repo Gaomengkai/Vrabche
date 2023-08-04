@@ -219,10 +219,10 @@ void R5FakeSeihai::emitFakeSeihai()
     }
     // 差个@memset
     funcUsedReg["@memset"] = {a0, a1, a2};
-    LOGW("FuncName: " << thisFunc->getName());
+    LOGD("FuncName: " << thisFunc->getName());
     for (const auto& bb : thisFunc->getBasicBlocks()) {
         emitBB(bb);   // bbName and bb itself will be added Into blockStrangeFake in this func.
-        LOGW(bbNames.back());
+        LOGD(bbNames.back());
         for (auto& i : blockStrangeFake.back()) { LOGD(i.toString(true)); }
     }
 

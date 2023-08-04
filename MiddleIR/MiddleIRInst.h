@@ -123,7 +123,7 @@ protected:
 
 public:
     [[nodiscard]] bool isDeleted() const;
-    void               setDeleted(bool deleted);
+    void               setDeleted(bool deleted=true);
 
 private:
     bool   mustAddFirst  = false;

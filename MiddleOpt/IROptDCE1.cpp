@@ -19,6 +19,7 @@ void IROptDCE1::run()
     // 这个优化仅仅针对于一个函数只有一个基本块的情况
     // 以后再考虑多个基本块的情况
     // 也就是说，这个优化仅仅针对于没有跳转的情况
+    hasChanged = false;
     for (auto& func : _irast->funcDefs) {
         if (func->getBasicBlocks().size() > 1) { continue; }
         IR_ASSERT(func->getBasicBlocks().size() == 1, "A Func Must Have At Least One BasicBlock");
@@ -112,59 +113,11 @@ void IROptDCE1::run()
             sideEffect.clear();
         }
 
-
-        // 数组的alloca逆向全设置为有用变量
-        //        for (auto& i : bb->_instructions) {
-        //            if (i->isAllocaInst()) {
-        //                auto allocaInst = std::dynamic_pointer_cast<AllocaInst>(i);
-        //                if (!dynamic_pointer_cast<PointerType>(allocaInst->getType())
-        //                         ->getElementType()
-        //                         ->isArray())
-        //                    continue;
-        //                isUseless2[i] = false;
-        //                // bfs
-        //                std::queue<SPInst> q;
-        //                q.push(allocaInst);
-        //                while (!q.empty()) {
-        //                    auto cur = q.front();
-        //                    q.pop();
-        //                    for (auto& usedBy : instUsedBy[cur]) {
-        //                        if (isUseless2[usedBy]) {
-        //                            isUseless2[usedBy] = false;
-        //                            q.push(usedBy);
-        //                        }
-        //                    }
-        //                }
-        //            }
-        //        }
-        //
-        //        // 合并结果，isUseless2 -> isUseless
-        //        for (auto& i : bb->_instructions) {
-        //            // in 1 , i is useless
-        //            if (!isUseless2[i]) {
-        //                // bfs.
-        //                std::queue<SPInst> q;
-        //                q.push(i);
-        //                while (!q.empty()) {
-        //                    auto cur = q.front();
-        //                    q.pop();
-        //                    isUseless[cur] = false;
-        //                    for (auto& used : cur->getUseList()) {
-        //                        if (isUseless[*used]) {
-        //                            if (auto usedInst = dynamic_pointer_cast<MiddleIRInst>(*used))
-        //                            {
-        //                                q.push(usedInst);
-        //                            }
-        //                        }
-        //                    }
-        //                }
-        //            }
-        //        }
-
         // 遍历所有use，如果没有被覆盖，那么就是无用变量
         for (auto& inst : bb->_instructions) {
             if (isUseless[inst]) {
                 inst->setDeleted(true);
+                hasChanged = true;
                 std::cout << "del ";
                 if (auto store = dynamic_pointer_cast<StoreInst>(inst)) {
                     std::cout << "store " << store->getFrom()->getName() << "->"
@@ -178,5 +131,6 @@ void IROptDCE1::run()
         // 结果：
         std::cout << bb->_instructions.size() << std::endl;
     }
+    LOGW("DCE1 Done");
 }
 }   // namespace MiddleIR::Optimizer

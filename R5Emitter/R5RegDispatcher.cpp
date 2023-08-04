@@ -220,4 +220,5 @@ const std::set<YangReg>& R5RegDispatcher::getTotalUsedRegs() const
 {
     return totalUsedRegs;
 }
+
 }   // namespace R5Emitter

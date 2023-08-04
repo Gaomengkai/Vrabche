@@ -61,7 +61,7 @@ void RISC_V_Backend(std::istream& in, std::ostream& out)
     auto     SPCopiedAST = make_shared<MiddleIRAST>(irAST);
     uint64_t opt;
     if (!optimizationLevel.empty()) {
-        opt = IROptimizer::DEAD_CODE_ELIMINATION;
+        opt = IROptimizer::ALL;
     } else
         opt = IROptimizer::O0;
     IROptimizer optimizer(SPCopiedAST, static_cast<IROptimizer::ENABLED_OPT>(opt));
@@ -72,7 +72,7 @@ void RISC_V_Backend(std::istream& in, std::ostream& out)
     emitter->build(out);
 }
 
-void frontEnd(std::istream& in, std::ostream& out, string filename = "")
+void frontEnd(std::istream& in, std::ostream& out, const string& filename = "")
 {
     ANTLRInputStream  f_input(in);
     SysyLexer         f_lexer(&f_input);
