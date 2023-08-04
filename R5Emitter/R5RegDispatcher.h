@@ -28,9 +28,6 @@ public:
     YangReg allocateIR(YangReg r);
     YangReg allocateFR(YangReg r);
     YangReg allocateR(YangReg r);
-    YangReg allocateHard(const string& vName, YangReg r);
-    void allocateHardOffset(const string& vName, int64_t offset);
-
     /// 查询变量在栈上的偏移
     /// \param vName
     /// \return 如果变量在栈上，返回偏移（相对于sp）；否则返回-1
@@ -69,7 +66,6 @@ private:
     std::set<RPri>            freeFRegs;
     std::map<YangReg, string> reg2Var;
     std::map<string, YangReg> var2Reg;
-    std::unordered_map<string, int64_t> extArgStackOffset;
     static void               insertReg(std::set<RPri>& regs, YangReg r);
     int64_t                   allocateStack(const string& vName, int64_t sz);
     YangReg                   allocateV(const string& vName, bool isFloat);

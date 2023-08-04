@@ -57,12 +57,10 @@ R5RegAllocator::R5RegAllocator(
     const std::vector<string>&                        bbNames_,
     const std::vector<std::vector<R5AsmStrangeFake>>& bbCodes_,
     R5TaichiMap&                                      taichiMap_,
-    const fu&                                         fu_,
-    const std::shared_ptr<MiddleIRFuncDef>&           thisFunc_
+    const fu&                                         fu_
 )
     : taichiMap(taichiMap_)
     , _fu(fu_)
-    , thisFunc(thisFunc_)
 {
     bbNames = std::vector<string>(bbNames_.begin(), bbNames_.end());
     bbCodes = std::vector<std::vector<R5AsmStrangeFake>>(bbCodes_.begin(), bbCodes_.end());
@@ -89,6 +87,13 @@ void R5RegAllocator::doAllocate(int bbIndex)
     auto& dest = allocatedCodes[bbIndex];
     // 构建每个寄存器的lifespan。（unordered_map)
     LifespanMap lifespan;
+
+    // 预处理结束。
+
+    // 打印替换结果。
+    //    for (int i = 0; i < bb.size(); i++) {
+    //        std::cout << i << ":\t" << bb[i].toString() << std::endl;
+    //    }
     // 倒序扫描基本块，构建lifespan
     for (int j = (int)bb.size() - 1; j >= 0; --j) {
         auto inst = bb[j];
@@ -208,19 +213,6 @@ void R5RegAllocator::doAllocate(int bbIndex)
 
     // 分配器
     auto dispatcher = R5RegDispatcher(taichiMap, lifespan);
-    // 预分配函数参数。（只在以LEntry结尾的bbName中执行）
-    auto bbName = bbNames[bbIndex];
-    if (bbName.size() > 6 && bbName.substr(bbName.size() - 6) == "LEntry") {
-        auto argMap = buildArgRegMap();
-        for (auto& [arg, reg] : argMap) {
-            dispatcher.allocateHard(arg, reg);
-        }
-        auto extArgMap = buildExtArgRegMap();
-        for (auto& [arg, off] : extArgMap) {
-            dispatcher.allocateHardOffset(arg, off);
-        }
-    }
-
     for (int i = 0; i < bb.size(); i++) {
 
         auto& inst = bb[i];
@@ -423,48 +415,6 @@ const std::vector<std::vector<R5AsmStrangeFake>>& R5RegAllocator::getAllocatedCo
 const std::set<YangReg>& R5RegAllocator::getTotalUsedRegs() const
 {
     return totalUsedRegs;
-}
-std::unordered_map<string, YangReg> R5RegAllocator::buildArgRegMap()
-{
-    std::unordered_map<string, YangReg> ret;
-    auto                                iReg  = a0;
-    auto                                fReg  = fa0;
-    const auto&                         types = thisFunc->getParamsTypes();
-    const auto&                         names = thisFunc->getParamsNames();
-    for (auto i = 0; i < types.size(); i++) {
-        const auto& name = names[i];
-        if ((types[i]->isInt() || types[i]->isPointer()) && iReg <= a7) {
-            ret[name] = iReg;
-            iReg      = static_cast<YangReg>(iReg + 1);
-        } else if (types[i]->isFloat() && fReg <= fa7) {
-            ret[name] = fReg;
-            fReg      = static_cast<YangReg>(fReg + 1);
-        }
-        if (iReg > a7 && fReg > fa7) break;
-    }
-    return ret;
-}
-
-std::unordered_map<string, int64_t> R5RegAllocator::buildExtArgRegMap()
-{
-    std::unordered_map<string, int64_t> ret;
-    auto                                iReg      = a0;
-    auto                                fReg      = fa0;
-    const auto&                         types     = thisFunc->getParamsTypes();
-    const auto&                         names     = thisFunc->getParamsNames();
-    int64_t                             nowOffset = 0;
-    for (auto i = 0; i < types.size(); i++) {
-        const auto& name = names[i];
-        if ((types[i]->isInt() || types[i]->isPointer()) && iReg <= a7) {
-            iReg = static_cast<YangReg>(iReg + 1);
-        } else if (types[i]->isFloat() && fReg <= fa7) {
-            fReg = static_cast<YangReg>(fReg + 1);
-        } else {
-            ret[name] = nowOffset;
-            nowOffset += 8;
-        }
-    }
-    return ret;
 }
 
 }   // namespace R5Emitter

@@ -171,26 +171,8 @@ YangReg R5RegDispatcher::allocateR(YangReg r)
     totalUsedRegs.insert(r);
     return r;
 }
-YangReg R5RegDispatcher::allocateHard(const string& vName, YangReg r)
-{
-    std::set<RPri>& freeRegs = isFloat(r) ? freeFRegs : freeIRegs;
-    if (r == InvalidReg) return r;
-    if (freeRegs.find({r, regPri[r]}) == freeRegs.end()) {
-        // allocate stack here.
-        throw std::runtime_error("allocateHard failed.");
-    }
-    freeRegs.erase({r, regPri[r]});
-    nowUsedRegs.insert(r);
-    totalUsedRegs.insert(r);
-    reg2Var[r]   = vName;
-    var2Reg[vName] = r;
-    return r;
-}
 int64_t R5RegDispatcher::queryStackOffset(const string& vName)
 {
-    if(auto it = extArgStackOffset.find(vName);it!=extArgStackOffset.end()) {
-        return it->second;
-    }
     return taichiMap.query(preTaichi(vName));
 }
 int64_t R5RegDispatcher::allocateStack(const string& vName, int64_t sz)
@@ -237,9 +219,6 @@ string R5RegDispatcher::preTaichi(const string& vName)
 const std::set<YangReg>& R5RegDispatcher::getTotalUsedRegs() const
 {
     return totalUsedRegs;
-}
-void R5RegDispatcher::allocateHardOffset(const string& vName, int64_t offset) {
-    extArgStackOffset[vName] = offset;
 }
 
 }   // namespace R5Emitter
