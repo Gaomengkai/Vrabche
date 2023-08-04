@@ -22,6 +22,7 @@ void IROptCF::ConstFold(const shared_ptr<MiddleIRBasicBlock>& bb)
     do {
         mapConstReplace.clear();
         for (const auto& i : bb->_instructions) {
+            if (i->isDeleted()) { continue; }
             if (auto binOpInst = DPC(IMathInst, i)) {
                 auto lhs      = binOpInst->getOpVal1();
                 auto rhs      = binOpInst->getOpVal2();
@@ -70,6 +71,13 @@ void IROptCF::ConstFold(const shared_ptr<MiddleIRBasicBlock>& bb)
                     i->tryReplaceUse(*u, mapConstReplace[*u]);
                     break;
                 }
+            }
+        }
+        auto ter = bb->getTerminator();
+        for (auto& u : ter->getUseList()) {
+            if (mapConstReplace.find(*u) != mapConstReplace.end()) {
+                ter->tryReplaceUse(*u, mapConstReplace[*u]);
+                break;
             }
         }
     } while (!mapConstReplace.empty());
