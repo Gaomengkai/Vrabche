@@ -10,7 +10,9 @@
 #include "R5AsmStrangeFake.h"
 #include "R5TaichiMap.h"
 #include "R5Yang.h"
+#include "MiddleIRFuncDef.h"
 
+using MiddleIR::MiddleIRFuncDef;
 using fu = std::unordered_map<string, std::set<R5Emitter::YangReg>>;
 namespace R5Emitter
 {
@@ -21,8 +23,9 @@ public:
     R5RegAllocator(
         const std::vector<string>&                        bbNames_,
         const std::vector<std::vector<R5AsmStrangeFake>>& bbCodes_,
-        R5TaichiMap&                                    taichiMap_,
-        const fu&                                         fu_
+        R5TaichiMap&                                      taichiMap_,
+        const fu&                                         fu_,
+        const std::shared_ptr<MiddleIRFuncDef>&           thisFunc_
     );
 
     // 为所有基本块分配寄存器
@@ -37,6 +40,7 @@ protected:
     // 太极图引用。用于记录、分配栈空间。
     // 太极图是在函数层面的。
     R5TaichiMap& taichiMap;
+    const std::shared_ptr<MiddleIRFuncDef>&           thisFunc;
 
     // 所有基本块的名字的拷贝
     std::vector<string> bbNames;
@@ -58,6 +62,7 @@ protected:
 
     // 获取那个函数的寄存器使用情况
     std::set<YangReg> getUsedRegs(string funcName);
+    std::unordered_map<string, YangReg> buildArgRegMap();
 };
 
 }   // namespace R5Emitter

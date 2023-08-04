@@ -28,6 +28,7 @@ public:
     YangReg allocateIR(YangReg r);
     YangReg allocateFR(YangReg r);
     YangReg allocateR(YangReg r);
+    YangReg allocateHard(const string& vName, YangReg r);
     /// 查询变量在栈上的偏移
     /// \param vName
     /// \return 如果变量在栈上，返回偏移（相对于sp）；否则返回-1

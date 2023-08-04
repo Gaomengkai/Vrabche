@@ -42,6 +42,7 @@ public:
             "params_types.size() != params_names.size()"
         );
     }
+    [[nodiscard]] const vector<std::string>&  getParamsNames() const { return _params_names; }
     [[nodiscard]] const SPType& getRetType() const { return _retType; }
 };
 

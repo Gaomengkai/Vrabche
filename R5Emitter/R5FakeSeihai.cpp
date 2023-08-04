@@ -227,7 +227,8 @@ void R5FakeSeihai::emitFakeSeihai()
     }
 
     // 函数级别的寄存器分配
-    R5RegAllocator regAllocator(bbNames, blockStrangeFake, taichiMap, funcUsedReg);
+    R5RegAllocator
+        regAllocator(bbNames, blockStrangeFake, taichiMap, funcUsedReg, thisFunc);
     allocatedCodes       = regAllocator.getAllocatedCodes();
     auto totalUsedRegRes = regAllocator.getTotalUsedRegs();
     // remove NOT Callee-save regs
@@ -976,10 +977,10 @@ void R5FakeSeihai::handleStoreInst(
     auto storeInst = std::dynamic_pointer_cast<StoreInst>(inst1);
     auto from      = storeInst->getFrom();
     // 短路处理from事arg的情况。
-    if (from->getName().substr(0, 5) == "%arg_") {
-        handleArgStoreInst(sf, storeInst);
-        return;
-    }
+//    if (from->getName().substr(0, 5) == "%arg_") {
+//        handleArgStoreInst(sf, storeInst);
+//        return;
+//    }
     auto    to      = storeInst->getTo();
     bool    isFloat = from->getType()->isFloat();
     FakeOPs op      = isFloat ? FSW : SW;

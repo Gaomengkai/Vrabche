@@ -40,9 +40,9 @@ public:
     {
         //        if (NONE_OPTIMIZATION & enabledOpt) { _optimizers.push_back(new
         //        NoneOptimizer(irast_)); }
-        // if (REDUNDANT_LOAD_ELIMINATION & enabledOpt) {
-        //     _optimizers.push_back(new RedundantLoadEliminationOptimizer(irast_));
-        // }
+        if (REDUNDANT_LOAD_ELIMINATION & enabledOpt) {
+            _optimizers.push_back(new RedundantLoadEliminationOptimizer(irast_));
+        }
         if (DEAD_CODE_ELIMINATION & enabledOpt) { _optimizers.push_back(new IROptDCE1(irast_)); }
         if (CAFP & enabledOpt) { _optimizers.push_back(new IROptCAFP(irast_)); }
         if (CSLR & enabledOpt) { _optimizers.push_back(new IROptCSLR(irast_)); }

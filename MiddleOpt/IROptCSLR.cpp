@@ -39,7 +39,6 @@ void IROptCSLR::OptForOneFunction(const shared_ptr<MiddleIRFuncDef>& func)
     if (!optForThis) { return; }
     // 仅供外部的基本块使用。所以最后一个SC要覆盖前一个。
     map<SP<MiddleIRBasicBlock>, map<SP<MiddleIRVal>, SP<R5IRValConst>>> mapBBToMapConstToVar;
-    map<SP<MiddleIRBasicBlock>, std::set<SP<MiddleIRBasicBlock>>>       mapAllPrevBBs;
     map<SP<MiddleIRBasicBlock>, std::set<SP<AllocaInst>>>               commonStore;
     // CS
     for (auto& b : func->getBasicBlocks()) {
@@ -86,13 +85,14 @@ void IROptCSLR::OptForOneFunction(const shared_ptr<MiddleIRFuncDef>& func)
                 }
             }
         }
+
         std::map<SP<AllocaInst>, SP<R5IRValConst>> mapAllocaToConst;
-        std::queue<SP<MiddleIRBasicBlock>>         q;
+        std::queue<pair<SP<MiddleIRBasicBlock>,int>>         q;
         std::set<SP<MiddleIRBasicBlock>>           setVisited;
         // 1st pass: add all CS
-        for (const auto& p : b->getPrev()) { q.push(p); }
+        for (const auto& p : b->getPrev()) { q.emplace(p,0); }
         while (!q.empty()) {
-            auto bb = q.front();
+            auto [bb,d] = q.front();
             q.pop();
             if (setVisited.find(bb) != setVisited.end()) { continue; }
             setVisited.insert(bb);
@@ -106,28 +106,30 @@ void IROptCSLR::OptForOneFunction(const shared_ptr<MiddleIRFuncDef>& func)
                     }
                 }
             }
-            for (const auto& p : bb->getPrev()) { q.push(p); }
+            for (const auto& p : bb->getPrev()) { q.emplace(p,d+1); }
         }
         // 2nd pass: erase common store
-        for (const auto& p : b->getPrev()) { q.push(p); }
+        std::queue<SP<MiddleIRBasicBlock>>         q2;
+        for (const auto& p : b->getPrev()) { q2.push(p); }
         setVisited.clear();
-        while (!q.empty()) {
-            auto bb = q.front();
-            q.pop();
+        while (!q2.empty()) {
+            auto bb = q2.front();
+            q2.pop();
             if (setVisited.find(bb) != setVisited.end()) { continue; }
             setVisited.insert(bb);
             if (auto it1 = commonStore.find(bb); it1 != commonStore.end()) {
                 for (auto& alloca : it1->second) { mapAllocaToConst.erase(alloca); }
             }
-            for (const auto& p : bb->getPrev()) { q.push(p); }
+            for (const auto& p : bb->getPrev()) { q2.push(p); }
         }
         // 3rd pass: build the replacement table.(loadInst -> const)
         std::unordered_map<SP<LoadInst>, SP<R5IRValConst>> mapLoad2Const;
         for (const auto& i : b->_instructions) {
-            if(auto inst = DPC(LoadInst, i)) {
-                if(auto allocaInst = DPC(AllocaInst, inst->getFrom())) {
-                    if(auto it1 = mapAllocaToConst.find(allocaInst); it1 != mapAllocaToConst.end()) {
-                        auto constVal = it1->second;
+            if (auto inst = DPC(LoadInst, i)) {
+                if (auto allocaInst = DPC(AllocaInst, inst->getFrom())) {
+                    if (auto it1 = mapAllocaToConst.find(allocaInst);
+                        it1 != mapAllocaToConst.end()) {
+                        auto constVal       = it1->second;
                         mapLoad2Const[inst] = constVal;
                     }
                 }
@@ -135,16 +137,14 @@ void IROptCSLR::OptForOneFunction(const shared_ptr<MiddleIRFuncDef>& func)
         }
         // 4th pass: replace
         for (const auto& i : b->_instructions) {
-            if(auto inst = DPC(LoadInst, i)) {
-                if( mapLoad2Const.find(inst) != mapLoad2Const.end()) {
-                    inst->setDeleted();
-                }
+            if (auto inst = DPC(LoadInst, i)) {
+                if (mapLoad2Const.find(inst) != mapLoad2Const.end()) { inst->setDeleted(); }
             } else {
-                for(auto &u:i->getUseList()) {
-                    if(auto loadInst = DPC(LoadInst, *u)) {
-                        if(auto it1 = mapLoad2Const.find(loadInst); it1 != mapLoad2Const.end()) {
+                for (auto& u : i->getUseList()) {
+                    if (auto loadInst = DPC(LoadInst, *u)) {
+                        if (auto it1 = mapLoad2Const.find(loadInst); it1 != mapLoad2Const.end()) {
                             i->tryReplaceUse(loadInst, it1->second);
-                            break; // 一条指令替换一次就够了。
+                            break;   // 一条指令替换一次就够了。
                         }
                     }
                 }
@@ -163,51 +163,50 @@ void IROptCSLR::OptForOneFunction(const shared_ptr<MiddleIRFuncDef>& func)
             mapConstReplace.clear();
             for (const auto& i : b->_instructions) {
                 if (auto binOpInst = DPC(IMathInst, i)) {
-                    auto lhs = binOpInst->getOpVal1();
-                    auto rhs = binOpInst->getOpVal2();
+                    auto lhs      = binOpInst->getOpVal1();
+                    auto rhs      = binOpInst->getOpVal2();
                     auto lhsConst = DPC(R5IRValConstInt, lhs);
                     auto rhsConst = DPC(R5IRValConstInt, rhs);
-                    if (lhsConst== nullptr || rhsConst == nullptr) { continue; }
+                    if (lhsConst == nullptr || rhsConst == nullptr) { continue; }
                     auto lhsVal = lhsConst->getValue();
                     auto rhsVal = rhsConst->getValue();
-                    int resVal;
+                    int  resVal;
                     switch (binOpInst->iMathOp) {
-                    case IMathInst::IMathOp::ADD: resVal=lhsVal+rhsVal; break;
-                    case IMathInst::IMathOp::SUB:resVal=lhsVal-rhsVal ;break;
-                    case IMathInst::IMathOp::MUL: resVal=lhsVal*rhsVal;break;
+                    case IMathInst::IMathOp::ADD: resVal = lhsVal + rhsVal; break;
+                    case IMathInst::IMathOp::SUB: resVal = lhsVal - rhsVal; break;
+                    case IMathInst::IMathOp::MUL: resVal = lhsVal * rhsVal; break;
                     case IMathInst::IMathOp::SDIV:
-                    case IMathInst::IMathOp::UDIV: resVal=lhsVal/rhsVal;break;
+                    case IMathInst::IMathOp::UDIV: resVal = lhsVal / rhsVal; break;
                     case IMathInst::IMathOp::SREM:
-                    case IMathInst::IMathOp::UREM: resVal=lhsVal%rhsVal;break;
+                    case IMathInst::IMathOp::UREM: resVal = lhsVal % rhsVal; break;
                     }
-                    auto resConst = make_shared<R5IRValConstInt>(resVal);
+                    auto resConst              = make_shared<R5IRValConstInt>(resVal);
                     mapConstReplace[binOpInst] = resConst;
                     i->setDeleted();
-                }
-                else if (auto fMathInst = DPC(FMathInst, i)) {
-                    auto lhs = fMathInst->getOpVal1();
-                    auto rhs = fMathInst->getOpVal2();
+                } else if (auto fMathInst = DPC(FMathInst, i)) {
+                    auto lhs      = fMathInst->getOpVal1();
+                    auto rhs      = fMathInst->getOpVal2();
                     auto lhsConst = DPC(R5IRValConstFloat, lhs);
                     auto rhsConst = DPC(R5IRValConstFloat, rhs);
-                    if (lhsConst== nullptr || rhsConst == nullptr) { continue; }
-                    auto lhsVal = lhsConst->getValue();
-                    auto rhsVal = rhsConst->getValue();
+                    if (lhsConst == nullptr || rhsConst == nullptr) { continue; }
+                    auto  lhsVal = lhsConst->getValue();
+                    auto  rhsVal = rhsConst->getValue();
                     float resVal;
                     switch (fMathInst->fMathOp) {
-                    case FMathInst::FMathOp::FADD: resVal=lhsVal+rhsVal; break;
-                    case FMathInst::FMathOp::FSUB:resVal=lhsVal-rhsVal ;break;
-                    case FMathInst::FMathOp::FMUL: resVal=lhsVal*rhsVal;break;
-                    case FMathInst::FMathOp::FDIV: resVal=lhsVal/rhsVal;break;
-                    case FMathInst::FMathOp::FREM: resVal=0;break;
+                    case FMathInst::FMathOp::FADD: resVal = lhsVal + rhsVal; break;
+                    case FMathInst::FMathOp::FSUB: resVal = lhsVal - rhsVal; break;
+                    case FMathInst::FMathOp::FMUL: resVal = lhsVal * rhsVal; break;
+                    case FMathInst::FMathOp::FDIV: resVal = lhsVal / rhsVal; break;
+                    case FMathInst::FMathOp::FREM: resVal = 0; break;
                     }
-                    auto resConst = make_shared<R5IRValConstFloat>(resVal);
+                    auto resConst              = make_shared<R5IRValConstFloat>(resVal);
                     mapConstReplace[fMathInst] = resConst;
                     i->setDeleted();
                 }
             }
             for (const auto& i : b->_instructions) {
                 for (auto& u : i->getUseList()) {
-                    if(mapConstReplace.find(*u) != mapConstReplace.end()) {
+                    if (mapConstReplace.find(*u) != mapConstReplace.end()) {
                         i->tryReplaceUse(*u, mapConstReplace[*u]);
                         break;
                     }

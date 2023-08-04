@@ -6,72 +6,68 @@
 
 namespace MiddleIR::Optimizer
 {
+template<typename T>
+using SP = shared_ptr<T>;
 void RedundantLoadEliminationOptimizer::run()
 {
     decltype(g_log_level) old_level = g_log_level;
-    g_log_level                      = LOG_LEVEL::LOG_LEVEL_DEBUG;
+    g_log_level                     = LOG_LEVEL::LOG_LEVEL_DEBUG;
     for (auto& func : _irast->funcDefs) {
-        LOGD("Enter Function "<<func->getName());
+        LOGD("Enter Function " << func->getName());
         for (auto& bb : func->getBasicBlocks()) {
-            LOGD("Enter BasicBlock "<<bb->getName());
-            // round 1: find first load from
-            std::set<shared_ptr<MiddleIRVal>> loadFrom;
-            std::unordered_map<shared_ptr<MiddleIRVal>, shared_ptr<MiddleIRInst>>
-                fromFirstRepWithSecond;
-            for (auto& inst : bb->_instructions) {
-                if (inst->isLoadInst()) {
-                    auto loadInst = dynamic_pointer_cast<LoadInst>(inst);
-                    // not in loadFrom, means this is the first load after a store
-                    if (loadFrom.find(loadInst->getFrom()) == loadFrom.end()) {
-                        loadFrom.insert(loadInst->getFrom());
-                        fromFirstRepWithSecond[loadInst->getFrom()] = loadInst;
+            LOGD("Enter BasicBlock " << bb->getName());
+            std::unordered_map<SP<AllocaInst>, SP<MiddleIRVal>>            map1;
+            std::unordered_map<SP<AllocaInst>, std::list<SP<MiddleIRVal>>> map2;
+            std::unordered_map<SP<MiddleIRVal>, SP<MiddleIRVal>>           map3;
+            for (auto& i : bb->_instructions) {
+                if (auto loadInst = DPC(LoadInst, i)) {
+                    auto from = loadInst->getFrom();
+                    if (auto fromAlloca = DPC(AllocaInst, from)) {
+                        if (auto it1 = map1.find(fromAlloca); it1 != map1.end()) {
+                            map2[fromAlloca].push_back(loadInst);
+                            map3[loadInst] = it1->second;
+                            i->setDeleted();
+                        } else {
+                            map1[fromAlloca] = loadInst;
+                        }
                     }
-                    // del this loadInst
-                    else
-                        inst->setDeleted(true);
                 } else {
-                    if (inst->isStoreInst()) {
-                        auto storeInst = dynamic_pointer_cast<StoreInst>(inst);
-                        if (loadFrom.find(storeInst->getTo()) != loadFrom.end()) {
-                            loadFrom.erase(storeInst->getTo());
+                    // replace
+                    for (auto& u : i->getUseList()) {
+                        if (auto it3 = map3.find(*u); it3 != map3.end()) {
+                            i->tryReplaceUse(*u, it3->second);
                         }
                     }
-                    for (const auto& u : inst->getUseList()) {
-                        // u must be a LOAD inst then we can optimize
-                        auto loadInst = dynamic_pointer_cast<LoadInst>(*u);
-                        if (!loadInst) continue;
-                        if (loadFrom.find(loadInst->getFrom()) != loadFrom.end()) {
-                            inst->tryReplaceUse(*u, fromFirstRepWithSecond[loadInst->getFrom()]);
+                    if (auto storeInst = DPC(StoreInst, i)) {
+                        auto from = storeInst->getFrom();
+                        auto to   = storeInst->getTo();
+                        if (auto toAlloca = DPC(AllocaInst, to)) {
+                            if (auto it1 = map1.find(toAlloca); it1 != map1.end()) {
+                                for (const auto& k1 : map2[toAlloca]) { map3.erase(k1); }
+                                map2.erase(toAlloca);
+                            }
+                            map1[toAlloca] = from;
                         }
                     }
                 }
             }
-            {
-                // handle the terminator inst(ret...)
-                auto inst = bb->getTerminator();
-                for (const auto& u : inst->getUseList()) {
-                    // u must be a LOAD inst then we can optimize
-                    auto loadInst = dynamic_pointer_cast<LoadInst>(*u);
-                    if (!loadInst) continue;
-                    if (loadFrom.find(loadInst->getFrom()) != loadFrom.end()) {
-                        inst->tryReplaceUse(*u, fromFirstRepWithSecond[loadInst->getFrom()]);
-                    }
+            // handle the terminator inst(ret...)
+            for (auto& u : bb->getTerminator()->getUseList()) {
+                if (auto it3 = map3.find(*u); it3 != map3.end()) {
+                    bb->getTerminator()->tryReplaceUse(*u, it3->second);
                 }
             }
-            // round 2: actually delete
-            // cannot inplace delete, because it will change the size of vector
-            // create another list
-            decltype(bb->_instructions) newInstList;
-            for (auto& inst : bb->_instructions) {
-                if (!inst->isDeleted()) { newInstList.push_back(inst); }
-                else {
-                    std::cout << "delete inst: " << inst->getName() <<  std::endl;
+            // delete
+            for (auto it = bb->_instructions.begin(); it != bb->_instructions.end();) {
+                if ((*it)->isDeleted()) {
+                    it = bb->_instructions.erase(it);
+                } else {
+                    ++it;
                 }
             }
-            bb->_instructions = newInstList;
         }
     }
     g_log_level = old_level;
 }
 
-}   // namespace MiddleIR
+}   // namespace MiddleIR::Optimizer
