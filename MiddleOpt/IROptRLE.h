@@ -10,11 +10,11 @@ namespace MiddleIR::Optimizer
 {
 
 
-class RedundantLoadEliminationOptimizer : public IROptimizerBase
+class IROptRLE : public IROptimizerBase
 {
 public:
     [[deprecated("This optimizer has bugs, please don't use it!")]]
-    explicit RedundantLoadEliminationOptimizer(const shared_ptr<MiddleIRAST>& irast_)
+    explicit IROptRLE(const shared_ptr<MiddleIRAST>& irast_)
         : IROptimizerBase(irast_)
     {
     }

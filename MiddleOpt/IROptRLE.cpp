@@ -2,13 +2,13 @@
 // Created by gaome on 2023/7/19.
 //
 
-#include "RedundantLoadEliminationOptimizer.h"
+#include "IROptRLE.h"
 
 namespace MiddleIR::Optimizer
 {
 template<typename T>
 using SP = shared_ptr<T>;
-void RedundantLoadEliminationOptimizer::run()
+void IROptRLE::run()
 {
     decltype(g_log_level) old_level = g_log_level;
     g_log_level                     = LOG_LEVEL::LOG_LEVEL_DEBUG;
@@ -40,6 +40,9 @@ void RedundantLoadEliminationOptimizer::run()
                     }
                     if (auto storeInst = DPC(StoreInst, i)) {
                         auto from = storeInst->getFrom();
+                        if(from->getName().size()>5 && from->getName().substr(0,5)=="%arg_"){
+                            continue;
+                        }
                         auto to   = storeInst->getTo();
                         if (auto toAlloca = DPC(AllocaInst, to)) {
                             if (auto it1 = map1.find(toAlloca); it1 != map1.end()) {
