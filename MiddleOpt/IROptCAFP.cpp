@@ -66,6 +66,7 @@ void IROptCAFP::run()
                                     continue;
                                 }
                             } else {
+                                setFnNameIgnored.insert(callInst->getFunc()->getName());
                                 goto next_inst;
                             }
                         }
@@ -81,6 +82,7 @@ void IROptCAFP::run()
                             if (auto cArg = dynamic_pointer_cast<R5IRValConst>(arg)) {
                                 listConstArgs.push_back(cArg);
                             } else {
+                                setFnNameIgnored.insert(callInst->getFunc()->getName());
                                 goto next_inst;
                             }
                         }
