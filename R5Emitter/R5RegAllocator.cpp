@@ -173,11 +173,25 @@ void R5RegAllocator::doAllocate(int bbIndex)
         }
         ls.ls = newL;
     }
+    /// 先别急。有些生死段比较长，可能被分为两节。这种情况**物理**寄存器是可以的。但是**%开头的虚拟寄存器**不行
+    for (auto& [name, ls] : lifespan) {
+        if (!name.empty() && name[0] == '%') {
+            // 如果被分成多段，需要记录最小出生点和最大死亡点。然后合并了。
+            int minBirth = INT_MAX;
+            int maxDeath = INT_MIN;
+            for (auto& [birth, death] : ls.ls) {
+                minBirth = std::min(minBirth, birth);
+                maxDeath = std::max(maxDeath, death);
+            }
+            ls.ls.clear();
+            ls.ls.emplace_back(minBirth, maxDeath);
+        }
+    }
     // 打印结果。
     // for (auto& [name, ls] : lifespan) {
     //     std::cout << name << ": ";
-    //     for (auto& [birth, death] : ls.ls) { std::cout << "(" << birth << "," << death << ") "; }
-    //     std::cout << std::endl;
+    //     for (auto& [birth, death] : ls.ls) { std::cout << "(" << birth << "," << death << ")
+    //     "; } std::cout << std::endl;
     // }
 
     // 构建结束。
