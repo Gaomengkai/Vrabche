@@ -45,17 +45,19 @@ public:
         if (OPT_RLE & enabledOpt) { _optimizers.push_back(new IROptRLE(irast_)); }
         if (OPT_DCE1 & enabledOpt) { _optimizers.push_back(new IROptDCE1(irast_)); }
         if (OPT_CAFP & enabledOpt) { _optimizers.push_back(new IROptCAFP(irast_)); }
-        //        if (OPT_CP & enabledOpt) { _optimizers.push_back(new IROptCP(irast_)); }
+        if (OPT_CP & enabledOpt) { _optimizers.push_back(new IROptCP(irast_)); }
         if (OPT_DCE2 & enabledOpt) { _optimizers.push_back(new IROptDCE2(irast_)); }
         if (OPT_IC & enabledOpt) { _optimizers.push_back(new IROptIC(irast_)); }
     }
     virtual void run()
     {
-        bool hasChanged = false;
+        bool hasChanged;
         do {
             hasChanged = false;
-            for (auto& optimizer : _optimizers) {
+            for (auto i = 0; i < _optimizers.size(); i++) {
+                auto& optimizer = _optimizers[i];
                 optimizer->run();
+                LOGW("Opt " << i << "done. Has changed: " << optimizer->hasChanged);
                 hasChanged |= optimizer->hasChanged;
             }
         } while (hasChanged);
