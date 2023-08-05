@@ -9,8 +9,10 @@
 #include "NoneOptimizer.h"
 #include "IROptRLE.h"
 #include "IROptDCE1.h"
+#include "IROptDCE2.h"
 #include "IROptCAFP.h"
-#include "IROptCSLR.h"
+#include "IROptCP.h"
+#include "IROptIC.h"
 
 namespace MiddleIR::Optimizer
 {
@@ -22,7 +24,7 @@ public:
         CONSTANT_FOLDING                 = 0x1,
         CONSTANT_PROPAGATION             = 0x2,
         COPY_PROPAGATION                 = 0x4,
-        OPT_DCE                          = 0x8,
+        OPT_DCE1                         = 0x8,
         COMMON_SUBEXPRESSION_ELIMINATION = 0x10,
         LOOP_OPTIMIZATION                = 0x20,
         FUNCTION_INLINE                  = 0x40,
@@ -30,7 +32,9 @@ public:
         OPT_RLE                          = 0x100,
         INSTRUCTION_COMBINE              = 0x200,
         OPT_CAFP                         = 0x400,
-        OPT_CSLR                         = 0x800,
+        OPT_CP                           = 0x800,
+        OPT_DCE2                         = 0x1000,
+        OPT_IC                           = 0x2000,
         ALL                              = (uint64_t)-1
     } enabledOpt           = O0;
     virtual ~IROptimizer() = default;
@@ -39,9 +43,11 @@ public:
         , enabledOpt(enabledOpt_)
     {
         if (OPT_RLE & enabledOpt) { _optimizers.push_back(new IROptRLE(irast_)); }
-        if (OPT_DCE & enabledOpt) { _optimizers.push_back(new IROptDCE1(irast_)); }
+        if (OPT_DCE1 & enabledOpt) { _optimizers.push_back(new IROptDCE1(irast_)); }
         if (OPT_CAFP & enabledOpt) { _optimizers.push_back(new IROptCAFP(irast_)); }
-        //        if (OPT_CSLR & enabledOpt) { _optimizers.push_back(new IROptCSLR(irast_)); }
+        //        if (OPT_CP & enabledOpt) { _optimizers.push_back(new IROptCP(irast_)); }
+        if (OPT_DCE2 & enabledOpt) { _optimizers.push_back(new IROptDCE2(irast_)); }
+        if (OPT_IC & enabledOpt) { _optimizers.push_back(new IROptIC(irast_)); }
     }
     virtual void run()
     {
