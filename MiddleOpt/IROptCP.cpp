@@ -402,7 +402,7 @@ EmulateCalc(shared_ptr<MiddleIRInst>& i, unordered_map<SP<MiddleIRVal>, FakeCons
             auto v1ci = DPC(R5IRValConstInt, std::get<C_IDX>(v1FConst));
             auto v1cf = DPC(R5IRValConstFloat, std::get<C_IDX>(v1FConst));
             auto v1cb = DPC(R5IRValConstI1, std::get<C_IDX>(v1FConst));
-            if (v1ci == nullptr) v1ci = IR_INT_CONST((int)v1cb->getValue());
+            if (v1ci == nullptr && v1cf == nullptr) v1ci = IR_INT_CONST((int)v1cb->getValue());
             switch (cv->getConvertOp()) {
             case ConvertInst::ConvertOp::ZEXT:
             case ConvertInst::ConvertOp::SEXT:
