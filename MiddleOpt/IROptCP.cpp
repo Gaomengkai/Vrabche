@@ -120,6 +120,8 @@ FakeConst MergeOne(FakeConst oldOne, FakeConst newOne)
 
 void IROptCP::For1Func(const shared_ptr<MiddleIRFuncDef>& func)
 {
+    // 基本块多于30，不优化
+    if (func->getBasicBlocks().size() > 30) return;
     // 常量传播是半格。只对alloca的单变量进行考虑，不考虑数组。
     // 1. 初始化: 找出所有的单变量alloca，将其初始化为undef
     std::set<SP<AllocaInst>> setAlloca;
@@ -307,9 +309,9 @@ EmulateCalc(shared_ptr<MiddleIRInst>& i, unordered_map<SP<MiddleIRVal>, FakeCons
         auto v2FConst = valConstMap[v2];
         if (v1->isConst()) v1FConst = DPC(R5IRValConst, v1);
         if (v2->isConst()) v2FConst = DPC(R5IRValConst, v2);
-        auto [v1ConstNew, v1NeedCalc] = Ohayouguzaimasu(v1FConst, v2FConst);
-        if (!v1NeedCalc) {
-            valConstMap[fMath] = v1ConstNew;
+        auto [constNew, needCalc] = Ohayouguzaimasu(v1FConst, v2FConst);
+        if (!needCalc) {
+            valConstMap[fMath] = constNew;
             return;
         } else {
             auto  v1c = DPC(R5IRValConstFloat, std::get<C_IDX>(v1FConst))->getValue();
@@ -395,8 +397,8 @@ EmulateCalc(shared_ptr<MiddleIRInst>& i, unordered_map<SP<MiddleIRVal>, FakeCons
     else if (auto cv = DPC(ConvertInst, i)) {
         auto v1       = cv->getFrom();
         auto v1FConst = valConstMap[v1];
-        if (v1->isConst()) {
-            v1FConst  = DPC(R5IRValConst, v1);
+        if (v1->isConst()) v1FConst = DPC(R5IRValConst, v1);
+        if (v1FConst.index() == C_IDX) {
             auto v1ci = DPC(R5IRValConstInt, std::get<C_IDX>(v1FConst));
             auto v1cf = DPC(R5IRValConstFloat, std::get<C_IDX>(v1FConst));
             switch (cv->getConvertOp()) {
