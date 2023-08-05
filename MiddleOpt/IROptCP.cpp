@@ -435,8 +435,11 @@ void IROptCP::ExecuteCurBB(
         if (i->isLoadInst()) {
             auto loadInst   = DPC(LoadInst, i);
             auto allocaInst = DPC(AllocaInst, loadInst->getFrom());
-            if (allocaInst == nullptr) continue;
-            valConstMap[loadInst] = map[allocaInst];
+            if (allocaInst == nullptr) {
+                // load一个非alloca应该谨慎。它是getelementptr的结果。它是全局变量。它是飞鸟，它是寒蝉。
+                valConstMap[loadInst] = NAC();
+            } else
+                valConstMap[loadInst] = map[allocaInst];
         } else if (i->isStoreInst()) {
             auto store    = DPC(StoreInst, i);
             auto from     = store->getFrom();
