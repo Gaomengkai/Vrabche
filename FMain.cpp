@@ -64,6 +64,7 @@ void RISC_V_Backend(std::istream& in, std::ostream& out)
         opt = IROptimizer::ALL;
     } else
         opt = IROptimizer::O0;
+    if (optimizationLevel == "-Otest") { opt = IROptimizer::ALL ^ IROptimizer::OPT_RSE; }
     IROptimizer optimizer(SPCopiedAST, static_cast<IROptimizer::ENABLED_OPT>(opt));
     optimizer.run();
 
@@ -140,7 +141,7 @@ int main(int argc, const char** argv)
                 std::cerr << "No output filename" << std::endl;
                 return 1;
             }
-        } else if (arg == "-O2" || arg == "-O1" || arg == "-O0") {
+        } else if (arg == "-O2" || arg == "-O1" || arg == "-O0" || arg == "-Otest") {
             optimizationLevel = arg;
         } else if (arg == "-S") {
             // do nothing
