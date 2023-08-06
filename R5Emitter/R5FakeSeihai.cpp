@@ -148,7 +148,7 @@ void R5FakeSeihai::emitStream(std::ostream& os)
     for (auto reg : totalUsedReg) {
         if (reg == ra || reg == s0) continue;
         auto offset = availableCalleeSavedRegStartOffset + 8 * j;
-        if(R5Yang::isFloatReg(reg))
+        if (R5Yang::isFloatReg(reg))
             accessStackWithTmp(fh, FSW, R(reg), offset, s0, t1);
         else
             accessStackWithTmp(fh, SD, R(reg), offset, s0, t1);
@@ -162,7 +162,7 @@ void R5FakeSeihai::emitStream(std::ostream& os)
     for (auto reg : totalUsedReg) {
         if (reg == ra || reg == s0) continue;
         auto offset = availableCalleeSavedRegStartOffset + 8 * j;
-        if(R5Yang::isFloatReg(reg))
+        if (R5Yang::isFloatReg(reg))
             accessStackWithTmp(fh, FLW, R(reg), offset, s0, t1);
         else
             accessStackWithTmp(fh, LD, R(reg), offset, s0, t1);
@@ -643,7 +643,7 @@ void R5FakeSeihai::handleGEPInst(
     }
     if (immSoFar) {
         // 还有待处理的立即数。
-        if(couldLoadWithRegImm(offset))
+        if (couldLoadWithRegImm(offset))
             sf.emplace_back(R5AsmStrangeFake(ADDI, {to, base, P(offset)}));
         else {
             auto t = V(E(), Pointer);
@@ -1193,7 +1193,7 @@ void R5FakeSeihai::handleIMathInst(
     if (op1->isConst())
         taichi1 = N(std::dynamic_pointer_cast<R5IRValConstInt>(op1)->getValue());   // const LAI
     else
-        taichi1 = V(op1->getName(), Int);   // var YIN
+        taichi1 = V(op1->getName(), Int);                                           // var YIN
     auto op2 = math->getOpVal2();
     if (op2->isConst())
         taichi2 = N(std::dynamic_pointer_cast<R5IRValConstInt>(op2)->getValue());
@@ -1250,6 +1250,31 @@ void R5FakeSeihai::handleIMathInst(
     case IMathInst::IMathOp::MUL: {
         // 乘法要求两个操作数都是寄存器
         // 不是的话，就要先把立即数装载到寄存器里
+        // 闲着也是闲着，可以把*2, *4 *8等等情况优化掉
+        if (taichi1->isLai() & taichi2->isYin()) S(taichi2, taichi1);
+        if (taichi2->isLai() & taichi1->isYin()) {
+            // 有可能是乘以2的幂
+            int num = std::static_pointer_cast<R5Lai>(taichi2)->value;
+            // 乘以负数的话，先把负号提出来
+            if (num > 0) {
+                if (num == 1) {
+                    sf.emplace_back(R5AsmStrangeFake(MV, {rd, taichi1}));
+                    break;
+                } else {
+                    int log2 = 0;
+                    while (num % 2 == 0) {
+                        num /= 2;
+                        log2++;
+                    }
+                    if (num == 1) {
+                        sf.emplace_back(R5AsmStrangeFake(SLLIW, {rd, taichi1, N(log2)}));
+                        break;
+                    }
+                }
+            } else if (num == 0) {
+                sf.emplace_back(R5AsmStrangeFake(ADDIW, {rd, R(zero), N(0)}));
+            }   // 小于0的不处理。懒得写了。
+        }
         if (taichi1->isLai()) {
             auto tmp = V(E(), Int);
             sf.emplace_back(R5AsmStrangeFake(LI, {tmp, taichi1}));
@@ -1265,7 +1290,7 @@ void R5FakeSeihai::handleIMathInst(
 
     case IMathInst::IMathOp::SDIV: {
         // 专为除以2的幂优化
-        if(taichi1->isYin() && taichi2->isLai()) {
+        if (taichi1->isYin() && taichi2->isLai()) {
             auto div_op2 = dynamic_pointer_cast<R5Lai>(taichi2)->value;
             if (div_op2 > 0 && (div_op2 & (div_op2 - 1)) == 0) {
                 int shift = 0;

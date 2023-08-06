@@ -13,6 +13,7 @@
 #include <queue>
 #include <variant>
 #include <set>
+#include "IROptCF.h"
 using std::list;
 using std::map;
 using std::pair;
@@ -30,17 +31,12 @@ IROptCP::IROptCP(const shared_ptr<MiddleIRAST>& irast)
 }
 void IROptCP::run()
 {
+    hasChanged = false;
     for (const auto& f : _irast->funcDefs) { For1Func(f); }
 }
 
-class UNDEF
-{
-};
-class NAC
-{
-};
-
-using FakeConst = variant<UNDEF, NAC, SP<R5IRValConst>>;
+using FakeConst     = variant<UNDEF, NAC, SP<R5IRValConst>>;
+const int UNDEF_IDX = 0, NAC_IDX = 1, C_IDX = 2;
 
 inline static bool ValConstEQ(const SP<R5IRValConst>& lhs, const SP<R5IRValConst>& rhs)
 {
@@ -73,35 +69,59 @@ bool merge(
     // 3 NAC @ C = NAC
     // 4 UNDEF @ UNDEF = UNDEF
     // 5 UNDEF @ C = C
+    // 5.5 UNDEF @ NAC = NAC
     // 6 C @ C = C
     // 7 C1 @ C2 = NAC (C1 != C2)
-    bool      changed   = false;
-    const int UNDEF_IDX = 0, NAC_IDX = 1, C_IDX = 2;
-    for (const auto& [k, v] : v2) {
+    // 8 C @ UNDEF = C
+    // 9 C @ NAC = NAC
+    bool changed = false;
+    for (const auto& [k, rhs] : v2) {
         if (v1.find(k) == v1.end()) {
-            v1[k]   = v;   // Rule 0
+            v1[k]   = rhs;   // Rule 0
             changed = true;
         } else {
-            if (v1[k].index() == UNDEF_IDX) {
-                changed = v.index() != UNDEF_IDX;
-                v1[k]   = v;   // Rule 4, 5
-            } else if (v1[k].index() == C_IDX && v.index() == C_IDX) {
+            auto& lhs = v1[k];
+            if (lhs.index() == UNDEF_IDX) {
+                changed |= (rhs.index() != UNDEF_IDX);
+                lhs = rhs;   // Rule 4, 5
+            } else if (lhs.index() == C_IDX && rhs.index() == C_IDX) {
                 // Rule 6, 7
-                if (!ValConstEQ(std::get<C_IDX>(v1[k]), std::get<C_IDX>(v))) {
-                    v1[k]   = NAC();   // Rule 7
+                if (!ValConstEQ(std::get<C_IDX>(lhs), std::get<C_IDX>(rhs))) {
+                    lhs     = NAC();   // Rule 7
                     changed = true;
                 }
+                // do nothing for Rule 6
+            } else if (lhs.index() == C_IDX && rhs.index() == UNDEF_IDX) {
+                // Rule 8 do nothing
             } else {
-                v1[k]   = NAC();   // Rule 1, 2, 3
-                changed = v.index() != NAC_IDX;
+                changed |= (lhs.index() != NAC_IDX);
+                lhs = NAC();   // Rule 1, 2, 3
             }
         }
     }
     return changed;
 }
 
+// 不同按newOne为准
+FakeConst MergeOne(FakeConst oldOne, FakeConst newOne)
+{
+    if (oldOne.index() == UNDEF_IDX) {
+        return newOne;
+    } else if (oldOne.index() == C_IDX && newOne.index() == C_IDX) {
+        if (ValConstEQ(std::get<C_IDX>(oldOne), std::get<C_IDX>(newOne))) {
+            return oldOne;
+        } else {
+            return newOne;
+        }
+    } else {
+        return NAC();
+    }
+}
+
 void IROptCP::For1Func(const shared_ptr<MiddleIRFuncDef>& func)
 {
+    // 基本块多于30，不优化
+    if (func->getBasicBlocks().size() > 30) return;
     // 常量传播是半格。只对alloca的单变量进行考虑，不考虑数组。
     // 1. 初始化: 找出所有的单变量alloca，将其初始化为undef
     std::set<SP<AllocaInst>> setAlloca;
@@ -122,185 +142,362 @@ void IROptCP::For1Func(const shared_ptr<MiddleIRFuncDef>& func)
         mapEachBBValStatus[b] = mapAllocaToVal;
     }
     // 2. from LEntry BFS.
-    bool                             changed = false;
+    bool                             changed;
     std::set<SP<MiddleIRBasicBlock>> visited;
     auto                             lEntryBB = func->getBasicBlock("LEntry");
     do {
         changed = false;
         queue<SP<MiddleIRBasicBlock>> q;
-        q.push(lEntryBB);
+        for (auto& b : func->getBasicBlocks()) q.push(b);
         while (!q.empty()) {
             auto bb = q.front();
             q.pop();
+            if (bb->getName() == "L4" && func->getName() == "@main") { int a = 1; }
             visited.insert(bb);
             auto& mapAllocaToVal = mapEachBBValStatus[bb];
-            // 遍历store即可。
-            for (auto& i : bb->_instructions) {
-                if (auto storeInst = DPC(StoreInst, i)) {
-                    auto allocaTo = DPC(AllocaInst, storeInst->getTo());
-                    if (allocaTo == nullptr) continue;
-                    auto val = storeInst->getFrom();
-                    if (auto constVal = DPC(R5IRValConst, val)) {
-                        if (auto c = std::get_if<SP<R5IRValConst>>(&mapAllocaToVal[allocaTo]);
-                            c == nullptr || *c != constVal) {
-                            changed                  = true;
-                            mapAllocaToVal[allocaTo] = constVal;
-                        }
-                    } else {
-                        if (std::get_if<NAC>(&mapAllocaToVal[allocaTo]) == nullptr) {
-                            changed                  = true;
-                            mapAllocaToVal[allocaTo] = NAC();
-                        }
-                    }
-                }
-            }
+            // 计算当前基本块的值状态。
+            //            auto t = mapAllocaToVal;
+            ExecuteCurBB(mapAllocaToVal, bb);
+            //            LOGW("After Calc:" << bb->getName());
+            printIt(mapEachBBValStatus);
+
             // 遍历后继。
             for (auto& s : bb->getNext()) {
-                if (visited.find(s) != visited.end()) { continue; }
-                // m[B'] ∧= m'
-                //  if m[B'] change then
-                //      change = true
-                //  end
+                bool jb = false;
+                jb |= merge(mapEachBBValStatus[s], mapAllocaToVal);
+                //                LOGW("Merged " << s->getName() << " from " << bb->getName() << "
+                //                changed=" << jb);
+                changed |= jb;
+                if (jb) { q.push(s); }
+                //                if (visited.find(s) != visited.end()) { continue; }
+                //                printIt(mapEachBBValStatus);
+                //                q.push(s);
             }
         }
+        //        printIt(mapEachBBValStatus);
     } while (changed);
-    // 3. 没想好。
-}
-
-[[deprecated("Use For1Func instead.")]] void
-IROptCP::OptForOneFunction(const shared_ptr<MiddleIRFuncDef>& func)
-{
-    bool optForThis = false;
-    for (auto& b : func->getBasicBlocks()) {
-        if (b->_instructions.size() > 1000) {
-            optForThis = true;
-            break;
-        }
+    //    printIt(mapEachBBValStatus);
+    // 3. 构建predecessor表
+    unordered_map<SP<MiddleIRBasicBlock>, std::set<SP<MiddleIRBasicBlock>>> mapPredecessor;
+    for (const auto& b : func->getBasicBlocks()) {
+        for (const auto& s : b->getNext()) { mapPredecessor[s].insert(b); }
     }
-    if (!optForThis) { return; }
-    // 仅供外部的基本块使用。所以最后一个SC要覆盖前一个。
-    map<SP<MiddleIRBasicBlock>, map<SP<MiddleIRVal>, SP<R5IRValConst>>> mapBBToMapConstToVar;
-    map<SP<MiddleIRBasicBlock>, std::set<SP<AllocaInst>>>               commonStore;
-    // CS
-    for (auto& b : func->getBasicBlocks()) {
-        map<SP<MiddleIRVal>, SP<R5IRValConst>> mapConstToVar;
-        std::set<SP<AllocaInst>>               setCommonStore;
+    // 4.
+    // 一些值在一个基本块中是不变的，他们可以直接替换，当且仅当这个基本块的所有前驱都是这个值，即：
+    // 合并之后，这个值在这个基本块中是不变的。（非UNDEF和NAC）
+    for (const auto& b : func->getBasicBlocks()) {
+        unordered_map<SP<AllocaInst>, FakeConst> mapReplaceReady;
+        for (const auto& a : setAlloca) { mapReplaceReady[a] = UNDEF(); }
+        for (const auto& p : mapPredecessor[b]) { merge(mapReplaceReady, mapEachBBValStatus[p]); }
+        // merge(mapReplaceReady, mapEachBBValStatus[b]);
+        // 可以提取出不是UNDEF和NAC的值。
+        unordered_map<SP<AllocaInst>, SP<R5IRValConst>> mapAllocaToValConst;
+        for (const auto& [a, v] : mapReplaceReady) {
+            if (v.index() == C_IDX) { mapAllocaToValConst[a] = std::get<C_IDX>(v); }
+        }
+        unordered_map<SP<LoadInst>, SP<R5IRValConst>> mapLoadToValConst;
+        for (const auto& i : b->_instructions) {
+            if (auto loadInst = DPC(LoadInst, i)) {
+                if (auto allocaFrom = DPC(AllocaInst, loadInst->getFrom())) {
+                    if (mapAllocaToValConst.find(allocaFrom) != mapAllocaToValConst.end()) {
+                        mapLoadToValConst[loadInst] = mapAllocaToValConst[allocaFrom];
+                        mapAllocaToValConst.erase(allocaFrom);   // 仅仅替换第一次。
+                    }
+                }
+            }
+        }
+        // 替换。
+
         for (auto& i : b->_instructions) {
-            if (auto storeInst = dynamic_pointer_cast<StoreInst>(i)) {
-                auto from = storeInst->getFrom();
-                auto to   = storeInst->getTo();
-                if (auto toAlloca = DPC(AllocaInst, to)) {
-                    if (auto constVal = dynamic_pointer_cast<R5IRValConst>(from)) {
-                        mapConstToVar[to] = constVal;
-                        setCommonStore.erase(toAlloca);
-                    } else {
-                        mapConstToVar.erase(to);
-                        setCommonStore.insert(toAlloca);
+            for (auto u : i->getUseList()) {
+                if (auto loadInst = DPC(LoadInst, *u)) {
+                    if (mapLoadToValConst.find(loadInst) != mapLoadToValConst.end()) {
+                        i->tryReplaceUse(loadInst, mapLoadToValConst[loadInst]);
+                        hasChanged = true;
                     }
                 }
             }
         }
-        if (!mapConstToVar.empty()) { mapBBToMapConstToVar[b] = mapConstToVar; }
-        if (!setCommonStore.empty()) { commonStore[b] = setCommonStore; }
+        auto i = b->getTerminator();
+        for (auto u : i->getUseList()) {
+            if (auto loadInst = DPC(LoadInst, *u)) {
+                if (mapLoadToValConst.find(loadInst) != mapLoadToValConst.end()) {
+                    i->tryReplaceUse(loadInst, mapLoadToValConst[loadInst]);
+                    hasChanged = true;
+                }
+            }
+        }
+        hasChanged |= IROptCF::ConstFold(b);
     }
-    if (mapBBToMapConstToVar.empty()) { return; }
-    // Nugprte, Reepvtich.
-
-    for (auto& b : func->getBasicBlocks()) {
-        // 找出所有的only-load.
-        std::set<SP<AllocaInst>> setOnlyLoad;
-        std::set<SP<AllocaInst>> setDisabledLoad;
-        for (const auto& i : b->_instructions) {
-            if (auto loadInst = dynamic_pointer_cast<LoadInst>(i)) {
-                auto from = loadInst->getFrom();
-                if (auto allocaInst = DPC(AllocaInst, from)) {
-                    if (setDisabledLoad.find(allocaInst) == setDisabledLoad.end()) {
-                        setOnlyLoad.insert(allocaInst);
-                    }
-                }
-            } else if (auto storeInst = dynamic_pointer_cast<StoreInst>(i)) {
-                auto to = storeInst->getTo();
-                if (auto toAlloca = DPC(AllocaInst, to)) {
-                    setDisabledLoad.insert(toAlloca);
-                    setOnlyLoad.erase(toAlloca);
-                }
-            }
-        }
-
-        std::map<SP<AllocaInst>, SP<R5IRValConst>>    mapAllocaToConst;
-        std::queue<pair<SP<MiddleIRBasicBlock>, int>> q;
-        std::set<SP<MiddleIRBasicBlock>>              setVisited;
-        // 1st pass: add all CS
-        for (const auto& p : b->getPrev()) { q.emplace(p, 0); }
-        while (!q.empty()) {
-            auto [bb, d] = q.front();
-            q.pop();
-            if (setVisited.find(bb) != setVisited.end()) { continue; }
-            setVisited.insert(bb);
-            if (auto it1 = mapBBToMapConstToVar.find(bb); it1 != mapBBToMapConstToVar.end()) {
-                for (auto& [alloca, constVal] : it1->second) {
-                    if (auto allocaInst = DPC(AllocaInst, alloca);
-                        allocaInst != nullptr &&
-                        setOnlyLoad.find(allocaInst) != setOnlyLoad.end()) {
-                        mapAllocaToConst[allocaInst] = constVal;
-                        setOnlyLoad.erase(allocaInst);
-                    }
-                }
-            }
-            for (const auto& p : bb->getPrev()) { q.emplace(p, d + 1); }
-        }
-        // 2nd pass: erase common store
-        std::queue<SP<MiddleIRBasicBlock>> q2;
-        for (const auto& p : b->getPrev()) { q2.push(p); }
-        setVisited.clear();
-        while (!q2.empty()) {
-            auto bb = q2.front();
-            q2.pop();
-            if (setVisited.find(bb) != setVisited.end()) { continue; }
-            setVisited.insert(bb);
-            if (auto it1 = commonStore.find(bb); it1 != commonStore.end()) {
-                for (auto& alloca : it1->second) { mapAllocaToConst.erase(alloca); }
-            }
-            for (const auto& p : bb->getPrev()) { q2.push(p); }
-        }
-        // 3rd pass: build the replacement table.(loadInst -> const)
-        std::unordered_map<SP<LoadInst>, SP<R5IRValConst>> mapLoad2Const;
-        for (const auto& i : b->_instructions) {
-            if (auto inst = DPC(LoadInst, i)) {
-                if (auto allocaInst = DPC(AllocaInst, inst->getFrom())) {
-                    if (auto it1 = mapAllocaToConst.find(allocaInst);
-                        it1 != mapAllocaToConst.end()) {
-                        auto constVal       = it1->second;
-                        mapLoad2Const[inst] = constVal;
-                    }
-                }
-            }
-        }
-        // 4th pass: replace
-        for (const auto& i : b->_instructions) {
-            if (auto inst = DPC(LoadInst, i)) {
-                if (mapLoad2Const.find(inst) != mapLoad2Const.end()) { inst->setDeleted(); }
+    LOGW("CP Done.");
+}
+void IROptCP::printIt(
+    unordered_map<SP<MiddleIRBasicBlock>, std::unordered_map<SP<AllocaInst>, FakeConst>>&
+        mapEachBBValStatus
+)
+{
+    return;
+    for (auto [bb, mapAllocaToVal] : mapEachBBValStatus) {
+        std::cout << bb->getName() << ": ";
+        for (auto [allocaInst, val] : mapAllocaToVal) {
+            std::cout << allocaInst->getName() << " ";
+            if (val.index() == NAC_IDX) {
+                std::cout << "NAC, ";
+            } else if (val.index() == UNDEF_IDX) {
+                std::cout << "UNDEF, ";
             } else {
-                for (auto& u : i->getUseList()) {
-                    if (auto loadInst = DPC(LoadInst, *u)) {
-                        if (auto it1 = mapLoad2Const.find(loadInst); it1 != mapLoad2Const.end()) {
-                            i->tryReplaceUse(loadInst, it1->second);
-                            break;   // 一条指令替换一次就够了。
-                        }
-                    }
+                auto c = std::get<C_IDX>(val);
+                if (c->getType()->type == MiddleIRType::INT) {
+                    std::cout << std::dynamic_pointer_cast<R5IRValConstInt>(c)->getValue() << ", ";
+                } else if (c->getType()->type == MiddleIRType::FLOAT) {
+                    std::cout << std::dynamic_pointer_cast<R5IRValConstFloat>(c)->getValue()
+                              << ", ";
+                } else {
+                    std::cout << "???, ";
                 }
             }
         }
-        for (auto it1 = b->_instructions.begin(); it1 != b->_instructions.end();) {
-            if ((*it1)->isDeleted()) {
-                it1 = b->_instructions.erase(it1);
-            } else {
-                ++it1;
-            }
-        }
-        // 5th pass: const fold
-        IROptCF::ConstFold(b);
+        std::cout << std::endl;
     }
 }
+
+///
+/// \param v1
+/// \param v2
+/// \return 值，是否需要计算
+inline std::tuple<FakeConst, bool> Ohayouguzaimasu(FakeConst& v1, FakeConst& v2)
+{
+    if (v1.index() == NAC_IDX) { return {NAC(), false}; }
+    if (v2.index() == NAC_IDX) { return {NAC(), false}; }
+    if (v1.index() == UNDEF_IDX) { return {UNDEF(), false}; }
+    if (v2.index() == UNDEF_IDX) { return {UNDEF(), false}; }
+    // now all C.
+    return {v1, true};
+}
+static void
+EmulateCalc(shared_ptr<MiddleIRInst>& i, unordered_map<SP<MiddleIRVal>, FakeConst>& valConstMap)
+{
+    if (auto iMath = DPC(IMathInst, i)) {
+        auto v1       = iMath->getOpVal1();
+        auto v2       = iMath->getOpVal2();
+        auto v1FConst = valConstMap[v1];
+        auto v2FConst = valConstMap[v2];
+        if (v1->isConst()) v1FConst = DPC(R5IRValConst, v1);
+        if (v2->isConst()) v2FConst = DPC(R5IRValConst, v2);
+        auto [aNew, v1NeedCalc] = Ohayouguzaimasu(v1FConst, v2FConst);
+        if (!v1NeedCalc) {
+            valConstMap[iMath] = aNew;
+            return;
+        } else {
+            auto v1c = DPC(R5IRValConstInt, std::get<C_IDX>(v1FConst))->getValue();
+            auto v2c = DPC(R5IRValConstInt, std::get<C_IDX>(v2FConst))->getValue();
+            int  res;
+            switch (iMath->iMathOp) {
+            case IMathInst::IMathOp::ADD: res = v1c + v2c; break;
+            case IMathInst::IMathOp::SUB: res = v1c - v2c; break;
+            case IMathInst::IMathOp::MUL: res = v1c * v2c; break;
+            case IMathInst::IMathOp::UDIV:
+            case IMathInst::IMathOp::SDIV: res = v1c / v2c; break;
+            case IMathInst::IMathOp::UREM:
+            case IMathInst::IMathOp::SREM: res = v1c % v2c; break;
+            }
+            valConstMap[iMath] = IR_INT_CONST(res);
+        }
+    }
+    //
+    else if (auto fMath = DPC(FMathInst, i)) {
+        auto v1       = fMath->getOpVal1();
+        auto v2       = fMath->getOpVal2();
+        auto v1FConst = valConstMap[v1];
+        auto v2FConst = valConstMap[v2];
+        if (v1->isConst()) v1FConst = DPC(R5IRValConst, v1);
+        if (v2->isConst()) v2FConst = DPC(R5IRValConst, v2);
+        auto [constNew, needCalc] = Ohayouguzaimasu(v1FConst, v2FConst);
+        if (!needCalc) {
+            valConstMap[fMath] = constNew;
+            return;
+        } else {
+            auto  v1c = DPC(R5IRValConstFloat, std::get<C_IDX>(v1FConst))->getValue();
+            auto  v2c = DPC(R5IRValConstFloat, std::get<C_IDX>(v2FConst))->getValue();
+            float res;
+            switch (fMath->fMathOp) {
+            case FMathInst::FMathOp::FADD: res = v1c + v2c; break;
+            case FMathInst::FMathOp::FSUB: res = v1c - v2c; break;
+            case FMathInst::FMathOp::FMUL: res = v1c * v2c; break;
+            case FMathInst::FMathOp::FDIV: res = v1c / v2c; break;
+            case FMathInst::FREM: res = 0; break;
+            }
+            valConstMap[fMath] = IR_FLOAT_CONST(res);
+        }
+    }
+    //
+    else if (auto icmp = DPC(ICmpInst, i)) {
+        auto v1       = icmp->getOpVal1();
+        auto v2       = icmp->getOpVal2();
+        auto v1FConst = valConstMap[v1];
+        auto v2FConst = valConstMap[v2];
+        if (v1->isConst()) v1FConst = DPC(R5IRValConst, v1);
+        if (v2->isConst()) v2FConst = DPC(R5IRValConst, v2);
+        auto [v1ConstNew, v1NeedCalc] = Ohayouguzaimasu(v1FConst, v2FConst);
+        if (!v1NeedCalc) {
+            valConstMap[icmp] = v1ConstNew;
+            return;
+        } else {
+            auto v1c = DPC(R5IRValConstInt, std::get<C_IDX>(v1FConst))->getValue();
+            auto v2c = DPC(R5IRValConstInt, std::get<C_IDX>(v2FConst))->getValue();
+            bool res;
+            switch (icmp->iCmpOp) {
+            case ICmpInst::EQ: res = v1c == v2c; break;
+            case ICmpInst::NE: res = v1c != v2c; break;
+            case ICmpInst::UGT:
+            case ICmpInst::SGT: res = v1c > v2c; break;
+            case ICmpInst::UGE:
+            case ICmpInst::SGE: res = v1c >= v2c; break;
+            case ICmpInst::ULT:
+            case ICmpInst::SLT: res = v1c < v2c; break;
+            case ICmpInst::ULE:
+            case ICmpInst::SLE: res = v1c <= v2c; break;
+            }
+            valConstMap[icmp] = IR_BOOL_CONST(res);
+        }
+    }
+    //
+    else if (auto fcmp = DPC(FCmpInst, i)) {
+        auto v1       = fcmp->getOpVal1();
+        auto v2       = fcmp->getOpVal2();
+        auto v1FConst = valConstMap[v1];
+        auto v2FConst = valConstMap[v2];
+        if (v1->isConst()) v1FConst = DPC(R5IRValConst, v1);
+        if (v2->isConst()) v2FConst = DPC(R5IRValConst, v2);
+        auto [v1ConstNew, v1NeedCalc] = Ohayouguzaimasu(v1FConst, v2FConst);
+        if (!v1NeedCalc) {
+            valConstMap[fcmp] = v1ConstNew;
+            return;
+        } else {
+            auto v1c = DPC(R5IRValConstFloat, std::get<C_IDX>(v1FConst))->getValue();
+            auto v2c = DPC(R5IRValConstFloat, std::get<C_IDX>(v2FConst))->getValue();
+            bool res;
+            switch (fcmp->fCmpOp) {
+            case FCmpInst::FCmpOp::OEQ: res = v1c == v2c; break;
+            case FCmpInst::FCmpOp::OGT: res = v1c > v2c; break;
+            case FCmpInst::FCmpOp::OGE: res = v1c >= v2c; break;
+            case FCmpInst::FCmpOp::OLT: res = v1c < v2c; break;
+            case FCmpInst::FCmpOp::OLE: res = v1c <= v2c; break;
+            case FCmpInst::FCmpOp::UEQ: res = v1c == v2c; break;
+            case FCmpInst::FCmpOp::UNE: res = v1c != v2c; break;
+            case FCmpInst::FCmpOp::UGT: res = v1c > v2c; break;
+            case FCmpInst::FCmpOp::UGE: res = v1c >= v2c; break;
+            case FCmpInst::FCmpOp::ULT: res = v1c < v2c; break;
+            case FCmpInst::FCmpOp::ULE: res = v1c <= v2c; break;
+            case FCmpInst::FCmpOp::FALSE: res = false; break;
+            case FCmpInst::FCmpOp::TRUE: res = true; break;
+            case FCmpInst::FCmpOp::UNO: res = false; break;
+            }
+            valConstMap[fcmp] = IR_BOOL_CONST(res);
+        }
+    }
+    //
+    else if (auto cv = DPC(ConvertInst, i)) {
+        auto v1       = cv->getFrom();
+        auto v1FConst = valConstMap[v1];
+        if (v1->isConst()) v1FConst = DPC(R5IRValConst, v1);
+        if (v1FConst.index() == C_IDX) {
+            auto v1ci = DPC(R5IRValConstInt, std::get<C_IDX>(v1FConst));
+            auto v1cf = DPC(R5IRValConstFloat, std::get<C_IDX>(v1FConst));
+            auto v1cb = DPC(R5IRValConstI1, std::get<C_IDX>(v1FConst));
+            if (v1ci == nullptr && v1cf == nullptr) v1ci = IR_INT_CONST((int)v1cb->getValue());
+            switch (cv->getConvertOp()) {
+            case ConvertInst::ConvertOp::ZEXT:
+            case ConvertInst::ConvertOp::SEXT:
+                valConstMap[cv] = IR_INT_CONST(v1ci->getValue());
+                break;
+            case ConvertInst::ConvertOp::FPTOUI:
+            case ConvertInst::ConvertOp::FPTOSI:
+                valConstMap[cv] = IR_INT_CONST(v1cf->getValue());
+                break;
+            case ConvertInst::ConvertOp::UITOFP:
+            case ConvertInst::ConvertOp::SITOFP:
+                valConstMap[cv] = IR_FLOAT_CONST((float)v1ci->getValue());
+                break;
+            case ConvertInst::TRUNC: break;
+            }
+        } else {
+            valConstMap[cv] = v1FConst;
+        }
+    }
+    //
+    else {
+        valConstMap[i] = NAC();
+    }
+}
+void IROptCP::ExecuteCurBB(
+    unordered_map<SP<AllocaInst>, FakeConst>& map, const shared_ptr<MiddleIRBasicBlock>& bb
+)
+{
+    unordered_map<SP<MiddleIRVal>, FakeConst> valConstMap;
+    std::unordered_set<SP<AllocaInst>>        allocaVis;
+    for (auto& i : bb->_instructions) {
+        if (i->isLoadInst()) {
+            auto loadInst   = DPC(LoadInst, i);
+            auto allocaInst = DPC(AllocaInst, loadInst->getFrom());
+            if (allocaInst == nullptr) {
+                // load一个非alloca应该谨慎。它是getelementptr的结果。它是全局变量。它是飞鸟，它是寒蝉。
+                valConstMap[loadInst] = NAC();
+            } else
+                valConstMap[loadInst] = map[allocaInst];
+        } else if (i->isStoreInst()) {
+            auto store    = DPC(StoreInst, i);
+            auto from     = store->getFrom();
+            auto to       = store->getTo();
+            auto toAlloca = DPC(AllocaInst, to);
+            if (toAlloca == nullptr) continue;
+            if (auto constFrom = DPC(R5IRValConst, from)) {
+                // 如果toAlloca来自上一级，则不同要给NAC，否则不同按后来者为准。
+                //                if (allocaVis.find(toAlloca) == allocaVis.end()) {
+                //                    // 还未访问过
+                //                    allocaVis.insert(toAlloca);
+                //                    // 如果这个constFrom和之前的不同，则给NAC
+                //                    // 1. before is NAC then give NAC;
+                //                    // 2. before is UNDEF, then give the constFrom;
+                //                    // 3. before is Const, then compare the value. if different,
+                //                    give NAC; else give
+                //                    //    constFrom;
+                //                    if (map[toAlloca].index() == C_IDX &&
+                //                        !ValConstEQ(std::get<C_IDX>(map[toAlloca]), constFrom)) {
+                //                        map[toAlloca] = NAC();
+                //                    } else {
+                //                        map[toAlloca] = MergeOne(map[toAlloca], constFrom);
+                //                    }
+                //                } else {
+                map[toAlloca] = MergeOne(map[toAlloca], constFrom);
+                //                }
+            } else {
+                if (auto it = valConstMap.find(from); it != valConstMap.end()) {
+                    // 同上
+                    //                    if (allocaVis.find(toAlloca) == allocaVis.end()) {
+                    //                        allocaVis.insert(toAlloca);
+                    //                        if (map[toAlloca].index() == C_IDX &&
+                    //                        it->second.index() == C_IDX &&
+                    //                            !ValConstEQ(
+                    //                                std::get<C_IDX>(map[toAlloca]),
+                    //                                std::get<C_IDX>(it->second)
+                    //                            )) {
+                    //                            map[toAlloca] = NAC();
+                    //                        } else {
+                    //                            map[toAlloca] = MergeOne(map[toAlloca],
+                    //                            it->second);
+                    //                        }
+                    //                    } else {
+                    map[toAlloca] = MergeOne(map[toAlloca], it->second);
+                    //                    }
+                }
+            }
+        } else {
+            EmulateCalc(i, valConstMap);
+        }
+    }
+}
+
+
 
 }   // namespace MiddleIR::Optimizer

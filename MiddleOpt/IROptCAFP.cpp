@@ -40,10 +40,7 @@ R5IRValConstEq(const shared_ptr<R5IRValConst>& v1, const shared_ptr<R5IRValConst
 }
 void IROptCAFP::run()
 {
-    if (powerOff) {
-        hasChanged = false;
-        return;
-    }
+    hasChanged = false;
     unordered_map<string, vector<shared_ptr<R5IRValConst>>> mapFnNameToConstArgs;
     std::unordered_set<string>                              setFnNameIgnored;
     for (const auto& f : _irast->funcDefs) {
@@ -113,11 +110,10 @@ void IROptCAFP::run()
                 auto arg      = args[argNum];
                 auto newStore = make_shared<StoreInst>(arg, storeInst->getTo());
                 i             = newStore;
+                hasChanged    = true;
             }
         }
     }
-    hasChanged = true;
-    powerOff   = true;
     // end
     LOGW("CAFP done");
 }
