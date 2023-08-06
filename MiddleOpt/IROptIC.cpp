@@ -31,7 +31,9 @@ void IROptIC::run()
                 //加入队列的条件是：是算术指令，且有一个操作数是常数，另一个操作数也是算术指令
                 //整形和浮点型中间隔了一个sext指令，所以不会出现浮点数和整数的运算，不考虑浮点
                 if (inst->isIMathInst()) {
-                    iMath.push(inst);
+                    auto i = dynamic_pointer_cast<IMathInst>(inst);
+                    if ((i->getOpVal1()->isConst() && dynamic_pointer_cast<IMathInst>(i->getOpVal2())) ||(i->getOpVal2()->isConst() && dynamic_pointer_cast<IMathInst>(i->getOpVal1())) )
+                        iMath.push(inst);
                 }
             }
         }
