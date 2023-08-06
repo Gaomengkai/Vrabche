@@ -189,7 +189,7 @@ void IROptCP::For1Func(const shared_ptr<MiddleIRFuncDef>& func)
         unordered_map<SP<AllocaInst>, FakeConst> mapReplaceReady;
         for (const auto& a : setAlloca) { mapReplaceReady[a] = UNDEF(); }
         for (const auto& p : mapPredecessor[b]) { merge(mapReplaceReady, mapEachBBValStatus[p]); }
-        merge(mapReplaceReady, mapEachBBValStatus[b]);
+        // merge(mapReplaceReady, mapEachBBValStatus[b]);
         // 可以提取出不是UNDEF和NAC的值。
         unordered_map<SP<AllocaInst>, SP<R5IRValConst>> mapAllocaToValConst;
         for (const auto& [a, v] : mapReplaceReady) {
@@ -201,6 +201,7 @@ void IROptCP::For1Func(const shared_ptr<MiddleIRFuncDef>& func)
                 if (auto allocaFrom = DPC(AllocaInst, loadInst->getFrom())) {
                     if (mapAllocaToValConst.find(allocaFrom) != mapAllocaToValConst.end()) {
                         mapLoadToValConst[loadInst] = mapAllocaToValConst[allocaFrom];
+                        mapAllocaToValConst.erase(allocaFrom);   // 仅仅替换第一次。
                     }
                 }
             }
