@@ -39,6 +39,9 @@ void IROptRSE::For1BB(const shared_ptr<MiddleIRBasicBlock>& b)
 
     for (auto& i : b->_instructions) {
         if (auto storeInst = DPC(StoreInst, i)) {
+            auto from     = storeInst->getFrom();
+            auto fromName = from->getName();
+            if (fromName.size() > 5 && fromName.substr(0, 5) == "%arg_") { continue; }
             auto dst = storeInst->getTo();
             if (map1.find(dst) != map1.end()) { set1.insert(map1[dst]); }
             map1[dst] = storeInst;
