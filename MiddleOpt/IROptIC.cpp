@@ -48,7 +48,9 @@ void IROptIC::run()
                 inst->tryReplaceUse(inst->getOpVal1(), p.first);
                 inst->tryReplaceUse(inst->getOpVal2(), p.second);
                 hasChanged = true;
-                iMath.push(inst);
+                if ((inst->getOpVal1()->isConst() && dynamic_pointer_cast<IMathInst>(inst->getOpVal2())) ||(inst->getOpVal2()->isConst() && dynamic_pointer_cast<IMathInst>(inst->getOpVal1()))){
+                    iMath.push(inst);
+                }
             }
         }
 
