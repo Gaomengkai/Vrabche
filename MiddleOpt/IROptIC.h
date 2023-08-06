@@ -90,19 +90,19 @@ public:
         if (_op == IMathInst::IMathOp::SUB) {
             if (!_val00.first->isConst()) {
                 lval = _val00.first;
-                rval = IR_INT_CONST(_val01.second + _val10.second + _val11.second + std::dynamic_pointer_cast<R5IRValConstInt>(rval)->getValue());
+                rval = IR_INT_CONST(_val01.second + _val10.second + _val11.second);
             }
             if (!_val01.first->isConst()) {
                 rval = _val01.first;
-                lval = IR_INT_CONST(_val00.second + _val10.second + _val11.second + std::dynamic_pointer_cast<R5IRValConstInt>(lval)->getValue());
+                lval = IR_INT_CONST(_val00.second + _val10.second + _val11.second);
             }
             if (!_val10.first->isConst()) {
                 rval = _val10.first;
-                lval = IR_INT_CONST(_val00.second + _val01.second + _val11.second + std::dynamic_pointer_cast<R5IRValConstInt>(lval)->getValue());
+                lval = IR_INT_CONST(_val00.second + _val01.second + _val11.second);
             }
             if (!_val11.first->isConst()) {
                 rval = _val11.first;
-                lval = IR_INT_CONST(_val00.second + _val01.second + _val10.second + std::dynamic_pointer_cast<R5IRValConstInt>(lval)->getValue());
+                lval = IR_INT_CONST(_val00.second + _val01.second + _val10.second);
             }
         }
         if (_op == IMathInst::IMathOp::MUL) {
