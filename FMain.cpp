@@ -64,7 +64,7 @@ void RISC_V_Backend(std::istream& in, std::ostream& out)
         opt = IROptimizer::ALL;
     } else
         opt = IROptimizer::O0;
-    if (optimizationLevel == "-Otest") { opt = IROptimizer::ALL ^ IROptimizer::OPT_CP; }
+    if (optimizationLevel == "-Otest") { opt = IROptimizer::ALL ^ IROptimizer::OPT_RSE; }
     IROptimizer optimizer(SPCopiedAST, static_cast<IROptimizer::ENABLED_OPT>(opt));
     optimizer.run();
 

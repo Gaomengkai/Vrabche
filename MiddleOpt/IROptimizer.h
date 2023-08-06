@@ -13,6 +13,7 @@
 #include "IROptCAFP.h"
 #include "IROptCP.h"
 #include "IROptIC.h"
+#include "IROptRSE.h"
 
 namespace MiddleIR::Optimizer
 {
@@ -35,6 +36,7 @@ public:
         OPT_CP                           = 0x800,
         OPT_DCE2                         = 0x1000,
         OPT_IC                           = 0x2000,
+        OPT_RSE                          = 0x4000,
         ALL                              = (uint64_t)-1
     } enabledOpt           = O0;
     virtual ~IROptimizer() = default;
@@ -48,6 +50,7 @@ public:
         if (OPT_CP & enabledOpt) { _optimizers.push_back(new IROptCP(irast_)); }
         if (OPT_DCE2 & enabledOpt) { _optimizers.push_back(new IROptDCE2(irast_)); }
         if (OPT_IC & enabledOpt) { _optimizers.push_back(new IROptIC(irast_)); }
+        if (OPT_RSE & enabledOpt) { _optimizers.push_back(new IROptRSE(irast_)); }
     }
     virtual void run()
     {

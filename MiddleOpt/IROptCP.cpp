@@ -156,16 +156,17 @@ void IROptCP::For1Func(const shared_ptr<MiddleIRFuncDef>& func)
             visited.insert(bb);
             auto& mapAllocaToVal = mapEachBBValStatus[bb];
             // 计算当前基本块的值状态。
-            auto t = mapAllocaToVal;
+            //            auto t = mapAllocaToVal;
             ExecuteCurBB(mapAllocaToVal, bb);
-            LOGW("After Calc:" << bb->getName());
+            //            LOGW("After Calc:" << bb->getName());
             printIt(mapEachBBValStatus);
 
             // 遍历后继。
             for (auto& s : bb->getNext()) {
                 bool jb = false;
                 jb |= merge(mapEachBBValStatus[s], mapAllocaToVal);
-                LOGW("Merged " << s->getName() << " from " << bb->getName() << " changed=" << jb);
+                //                LOGW("Merged " << s->getName() << " from " << bb->getName() << "
+                //                changed=" << jb);
                 changed |= jb;
                 if (jb) { q.push(s); }
                 //                if (visited.find(s) != visited.end()) { continue; }
@@ -234,6 +235,7 @@ void IROptCP::printIt(
         mapEachBBValStatus
 )
 {
+    return;
     for (auto [bb, mapAllocaToVal] : mapEachBBValStatus) {
         std::cout << bb->getName() << ": ";
         for (auto [allocaInst, val] : mapAllocaToVal) {
