@@ -13,13 +13,14 @@ void IROptRLE::run()
     hasChanged = false;
     for (auto& func : _irast->funcDefs) {
         for (auto& bb : func->getBasicBlocks()) {
-            std::unordered_map<SP<AllocaInst>, SP<MiddleIRVal>>            map1;
-            std::unordered_map<SP<AllocaInst>, std::list<SP<MiddleIRVal>>> map2;
-            std::unordered_map<SP<MiddleIRVal>, SP<MiddleIRVal>>           map3;
+            using Helios = MiddleIRVal;
+            std::unordered_map<SP<Helios>, SP<MiddleIRVal>>            map1;
+            std::unordered_map<SP<Helios>, std::list<SP<MiddleIRVal>>> map2;
+            std::unordered_map<SP<MiddleIRVal>, SP<MiddleIRVal>>       map3;
             for (auto& i : bb->_instructions) {
                 if (auto loadInst = DPC(LoadInst, i)) {
                     auto from = loadInst->getFrom();
-                    if (auto fromAlloca = DPC(AllocaInst, from)) {
+                    if (auto fromAlloca = DPC(Helios, from)) {
                         if (auto it1 = map1.find(fromAlloca); it1 != map1.end()) {
                             map2[fromAlloca].push_back(loadInst);
                             map3[loadInst] = it1->second;
@@ -41,7 +42,7 @@ void IROptRLE::run()
                             continue;
                         }
                         auto to = storeInst->getTo();
-                        if (auto toAlloca = DPC(AllocaInst, to)) {
+                        if (auto toAlloca = DPC(Helios, to)) {
                             if (auto it1 = map1.find(toAlloca); it1 != map1.end()) {
                                 for (const auto& k1 : map2[toAlloca]) { map3.erase(k1); }
                                 map2.erase(toAlloca);
