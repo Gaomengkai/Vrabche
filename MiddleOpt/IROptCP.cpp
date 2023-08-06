@@ -418,6 +418,8 @@ EmulateCalc(shared_ptr<MiddleIRInst>& i, unordered_map<SP<MiddleIRVal>, FakeCons
                 break;
             case ConvertInst::TRUNC: break;
             }
+        } else {
+            valConstMap[cv] = v1FConst;
         }
     }
     //
