@@ -72,6 +72,8 @@ void IROptInline::run()
         // 这里仅仅Inline一些简单函数（只有一个基本块，没有递归调用）
         // 筛选出可以inline的函数
         for (auto& f : _irast->funcDefs) {
+            // not main
+            if (f->getName() == "@main") continue;
             // single block
             if (f->getBasicBlocks().size() != 1) continue;
             // no recursive call
