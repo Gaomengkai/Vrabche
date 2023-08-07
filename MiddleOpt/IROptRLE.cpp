@@ -57,13 +57,17 @@ void IROptRLE::run()
                         auto to = storeInst->getTo();
                         if (auto toAlloca = DPC(Apollo, to)) {
                             if (auto it1 = map1.find(toAlloca); it1 != map1.end()) {
-                                for (const auto& k1 : map2[toAlloca]) { map3.erase(k1); }
+                                //                                for (const auto& k1 :
+                                //                                map2[toAlloca]) { map3.erase(k1);
+                                //                                }
                                 map2.erase(toAlloca);
                             }
                             map1[toAlloca] = from;
                         } else if (auto toGlobal = DPC(Athena, to)) {
                             if (auto it1 = map4.find(toGlobal); it1 != map4.end()) {
-                                for (const auto& k1 : map5[toGlobal]) { map3.erase(k1); }
+                                //                                for (const auto& k1 :
+                                //                                map5[toGlobal]) { map3.erase(k1);
+                                //                                }
                                 map5.erase(toGlobal);
                             }
                             map4[toGlobal] = from;
@@ -71,7 +75,8 @@ void IROptRLE::run()
                     } else if (i->isCallInst()) {
                         // 清除所有贮存的雅典娜
                         for (auto& [k1, v1] : map4) {
-                            for (const auto& k2 : map5[k1]) { map3.erase(k2); }
+                            //                            for (const auto& k2 : map5[k1]) {
+                            //                            map3.erase(k2); }
                             map5.erase(k1);
                         }
                         map4.clear();
