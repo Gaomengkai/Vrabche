@@ -25,7 +25,7 @@ public:
         _op = inst->getIMathOp();
         if (inst->getOpVal1()->isConst()) {
             _val00.first = inst->getOpVal1();
-            _val00.second = 1;
+            _val00.second = dynamic_pointer_cast<R5IRValConstInt>(_val00.first)->getValue();
             _val01.first = IR_INT_CONST(0);
             _val01.second = 0;
         }
@@ -39,7 +39,7 @@ public:
         }
         if (inst->getOpVal2()->isConst()) {
             _val10.first = inst->getOpVal2();
-            _val10.second = 1;
+            _val10.second = dynamic_pointer_cast<R5IRValConstInt>(_val10.first)->getValue();
             _val11.first = IR_INT_CONST(0);
             _val11.second = 0;
         }
@@ -53,7 +53,7 @@ public:
         }
     };
     bool couldCombine() {
-        bool strangeFake = (_val00.first->isConst() + _val01.first->isConst() + _val10.first->isConst() + _val11.first->isConst() == 3) && (_op == _opSon);
+        bool strangeFake = (_val00.first->isConst() + _val01.first->isConst() + _val10.first->isConst() + _val11.first->isConst() == 3) && (_op == _opSon|| (_opSon == IMathInst::IMathOp::ADD && _op == IMathInst::IMathOp::SUB) || (_opSon == IMathInst::IMathOp::SUB && _op == IMathInst::IMathOp::ADD));
         if (strangeFake) LOGW("could combine, now combine");
         else LOGW("not strange fake");
         return strangeFake;
@@ -62,47 +62,88 @@ public:
         SPVal lval;
         SPVal rval = IR_INT_CONST(0);
         if (_op == IMathInst::IMathOp::ADD) {
-            if (_val00.first->isConst()) {
-                rval = IR_INT_CONST(_val00.second + std::dynamic_pointer_cast<R5IRValConstInt>(rval)->getValue());
+            if (_opSon == IMathInst::IMathOp::ADD) {
+                if (_val00.first->isConst()) {
+                    rval = IR_INT_CONST(_val00.second + std::dynamic_pointer_cast<R5IRValConstInt>(rval)->getValue());
+                }
+                else {
+                    lval = _val00.first;
+                }
+                if (_val01.first->isConst()) {
+                    rval = IR_INT_CONST(_val01.second + std::dynamic_pointer_cast<R5IRValConstInt>(rval)->getValue());
+                }
+                else {
+                    lval = _val01.first;
+                }
+                if (_val10.first->isConst()) {
+                    rval = IR_INT_CONST(_val10.second + std::dynamic_pointer_cast<R5IRValConstInt>(rval)->getValue());
+                }
+                else {
+                    lval = _val10.first;
+                }
+                if (_val11.first->isConst()) {
+                    rval = IR_INT_CONST(_val11.second + std::dynamic_pointer_cast<R5IRValConstInt>(rval)->getValue());
+                }
+                else {
+                    lval = _val11.first;
+                }
             }
-            else {
-                lval = _val00.first;
-            }
-            if (_val01.first->isConst()) {
-                rval = IR_INT_CONST(_val01.second + std::dynamic_pointer_cast<R5IRValConstInt>(rval)->getValue());
-            }
-            else {
-                lval = _val01.first;
-            }
-            if (_val10.first->isConst()) {
-                rval = IR_INT_CONST(_val10.second + std::dynamic_pointer_cast<R5IRValConstInt>(rval)->getValue());
-            }
-            else {
-                lval = _val10.first;
-            }
-            if (_val11.first->isConst()) {
-                rval = IR_INT_CONST(_val11.second + std::dynamic_pointer_cast<R5IRValConstInt>(rval)->getValue());
-            }
-            else {
-                lval = _val11.first;
+            else {//sub
+                if (!_val00.first->isConst()) {
+                    lval = _val00.first;
+                    rval = IR_INT_CONST(-_val01.second + _val10.second + _val11.second);
+                }
+                if (!_val01.first->isConst()) {
+                    //这种就不合并了，会改变addInst的类型
+                    lval = nullptr;
+                    rval = nullptr;
+                }
+                if (!_val10.first->isConst()) {
+                    lval = _val10.first;
+                    rval = IR_INT_CONST(_val00.second + _val01.second - _val11.second);
+                }
+                if (!_val11.first->isConst()) {
+                    rval = nullptr;
+                    lval = nullptr;
+                }
             }
         }
         if (_op == IMathInst::IMathOp::SUB) {
-            if (!_val00.first->isConst()) {
-                lval = _val00.first;
-                rval = IR_INT_CONST(_val01.second + _val10.second + _val11.second);
+            if (_opSon == IMathInst::IMathOp::SUB){
+                if (!_val00.first->isConst()) {
+                    lval = _val00.first;
+                    rval = IR_INT_CONST(_val01.second + _val10.second + _val11.second);
+                }
+                if (!_val01.first->isConst()) {
+                    rval = _val01.first;
+                    lval = IR_INT_CONST(_val00.second - _val10.second - _val11.second);
+                }
+                if (!_val10.first->isConst()) {
+                    rval = _val10.first;
+                    lval = IR_INT_CONST(_val00.second - _val01.second - _val11.second);
+                }
+                if (!_val11.first->isConst()) {
+                    rval = _val11.first;
+                    lval = IR_INT_CONST(_val00.second - _val01.second - _val10.second);
+                }
             }
-            if (!_val01.first->isConst()) {
-                rval = _val01.first;
-                lval = IR_INT_CONST(_val00.second + _val10.second + _val11.second);
-            }
-            if (!_val10.first->isConst()) {
-                rval = _val10.first;
-                lval = IR_INT_CONST(_val00.second + _val01.second + _val11.second);
-            }
-            if (!_val11.first->isConst()) {
-                rval = _val11.first;
-                lval = IR_INT_CONST(_val00.second + _val01.second + _val10.second);
+            else {
+                if (!_val00.first->isConst()) {
+                    lval = _val00.first;
+                    rval = IR_INT_CONST(-_val01.second + _val10.second + _val11.second);
+                }
+                if (!_val01.first->isConst()) {
+                    lval = _val01.first;
+                    rval = IR_INT_CONST(-_val00.second + _val10.second + _val11.second);
+                }
+                if (!_val10.first->isConst()) {
+                    rval = _val10.first;
+                    rval = IR_INT_CONST(_val00.second + _val01.second - _val11.second);
+                }
+                if (!_val11.first->isConst()) {
+                    rval = _val11.first;
+                    lval = IR_INT_CONST(_val00.second + _val01.second - _val10.second);
+                }
             }
         }
         if (_op == IMathInst::IMathOp::MUL) {

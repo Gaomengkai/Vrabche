@@ -94,10 +94,29 @@ void IROptDCE2::run()
             for (auto &i :sideEffect) {
                 std::queue<SPInst> usefulInst;
                 if (auto sideVal = std::dynamic_pointer_cast<MiddleIRInst>(i)) {
+//                    if (!isUseless[sideVal]) continue;
                     isUseless[sideVal] = false;
                     usefulInst.push(sideVal);
                     while (!usefulInst.empty()) {
                         auto sideInst = usefulInst.front();
+//                        if (!sideInst->getName().empty()) LOGW("正常的" + sideInst->getName());
+//
+//                        else {
+//                            switch (sideInst->getInstType()) {
+//                            case 2:
+//                                LOGW("br");
+//                                break;
+//                            case 1:
+//                                LOGW("ret");
+//                                break;
+//                            case 8:
+//                                LOGW("store");
+//                                break;
+//                            case 12:
+//                                LOGW("call");
+//                                break;
+//                            }
+//                        }
                         usefulInst.pop();
                         for (auto &used : sideInst->getUseList()) {
                             if (auto usedInst = std::dynamic_pointer_cast<MiddleIRInst>(*used)) {

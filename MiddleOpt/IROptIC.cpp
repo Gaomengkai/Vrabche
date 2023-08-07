@@ -45,8 +45,13 @@ void IROptIC::run()
             IMathWithConst i(inst);
             if (i.couldCombine()) {
                 std::pair<SPVal, SPVal> p = i.combine();
-                inst->tryReplaceUse(inst->getOpVal1(), p.first);
-                inst->tryReplaceUse(inst->getOpVal2(), p.second);
+                if (p.first!=nullptr) {
+                    inst->tryReplaceUse(inst->getOpVal1(), p.first);
+                }
+                if (p.second!=nullptr) {
+                    inst->tryReplaceUse(inst->getOpVal2(), p.second);
+                }
+
                 hasChanged = true;
                 if ((inst->getOpVal1()->isConst() && dynamic_pointer_cast<IMathInst>(inst->getOpVal2())) ||(inst->getOpVal2()->isConst() && dynamic_pointer_cast<IMathInst>(inst->getOpVal1()))){
                     iMath.push(inst);
