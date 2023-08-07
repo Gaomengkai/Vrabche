@@ -1298,7 +1298,16 @@ void R5FakeSeihai::handleIMathInst(
                     div_op2 >>= 1;
                     shift++;
                 }
-                sf.emplace_back(R5AsmStrangeFake(SRAIW, {rd, taichi1, N(shift)}));
+                // 注意：如果是负数就寄了。所以不能够直接右移。gcc的做法是：
+                // 1. 先sraiw 31位，得到-1或者0 (tmp = lhs >> 31)
+                // 2. 再srliw 32-shift位 (tmp = tmp >> (32-shift))
+                // 3. addw (rd = lhs + tmp)
+                // 4. sraiw shift位 (rd = rd >> shift)
+                auto tmp = V(E(), Int);
+                sf.emplace_back(R5AsmStrangeFake(SRAIW, {tmp, taichi1, N(31)}));
+                sf.emplace_back(R5AsmStrangeFake(SRLIW, {tmp, tmp, N(32 - shift)}));
+                sf.emplace_back(R5AsmStrangeFake(ADDW, {rd, taichi1, tmp}));
+                sf.emplace_back(R5AsmStrangeFake(SRAIW, {rd, rd, N(shift)}));
                 break;
             }
         }
