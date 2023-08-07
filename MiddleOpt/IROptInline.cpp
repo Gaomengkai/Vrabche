@@ -142,110 +142,107 @@ void IROptInline::inlineSimpleFunc(const SPFDef& toInlineF)
     for (const auto& f : _irast->funcDefs) {
         LOGW("func: " << f->getName());
         for (auto b : f->getBasicBlocks()) {
-            for (auto iit = b->_instructions.begin(); iit != b->_instructions.end(); iit++) {
-                auto i = *iit;
-                if (auto callInst = DPC(CallInst, i)) {
-                    if (callInst->getFunc()->getName() != toInlineF->getName()) continue;
-                    hasChanged = true;
-                    // do here to replace.
-                    // make a copy
-                    std::list<SP<MiddleIRInst>>                       newInst;
-                    unordered_map<SP<MiddleIRInst>, SP<MiddleIRInst>> old2new;
-                    unordered_map<SP<MiddleIRInst>, SP<MiddleIRInst>> new2old;
-                    for (const auto& oi : oriInst) {
-                        auto c = copyInst(oi);
-                        newInst.push_back(c);
-                        old2new[oi] = c;
-                        new2old[c]  = oi;
-                    }
-                    // make an arg map
-                    // ATTENTION bare pointer
-                    vector<SP<MiddleIRVal>*> argMap(callInst->getArgs().size());
-                    auto                     callArgs = callInst->getArgs();
-                    for (auto& ni : newInst) {
-                        for (auto& u : ni->getUseList()) {
-                            auto uname = (*u)->getName();
-                            if (uname.size() > 5 && uname.substr(0, 5) == "%arg_") {
-                                auto argIdx = stoi(uname.substr(5));
-                                ni->tryReplaceUse(*u, callArgs[argIdx]);
-                                //                                argMap[argIdx] = u;
+            bool needContinue;
+            do {
+                needContinue = false;
+                for (auto iit = b->_instructions.begin(); iit != b->_instructions.end(); iit++) {
+                    auto i = *iit;
+                    if (auto callInst = DPC(CallInst, i)) {
+                        if (callInst->getFunc()->getName() != toInlineF->getName()) continue;
+                        hasChanged = true;
+                        // do here to replace.
+                        // make a copy
+                        std::list<SP<MiddleIRInst>>                       newInst;
+                        unordered_map<SP<MiddleIRInst>, SP<MiddleIRInst>> old2new;
+                        unordered_map<SP<MiddleIRInst>, SP<MiddleIRInst>> new2old;
+                        for (const auto& oi : oriInst) {
+                            auto c = copyInst(oi);
+                            newInst.push_back(c);
+                            old2new[oi] = c;
+                            new2old[c]  = oi;
+                        }
+                        // make an arg map
+                        // ATTENTION bare pointer
+                        vector<SP<MiddleIRVal>*> argMap(callInst->getArgs().size());
+                        auto                     callArgs = callInst->getArgs();
+                        for (auto& ni : newInst) {
+                            for (auto& u : ni->getUseList()) {
+                                auto uname = (*u)->getName();
+                                if (uname.size() > 5 && uname.substr(0, 5) == "%arg_") {
+                                    auto argIdx = stoi(uname.substr(5));
+                                    ni->tryReplaceUse(*u, callArgs[argIdx]);
+                                    //                                argMap[argIdx] = u;
+                                }
                             }
                         }
-                    }
 
-                    // rename new inst
-                    for (auto& ni : newInst) {
-                        if (!ni->getName().empty()) { ni->setName(newName()); }
-                    }
+                        // rename new inst
+                        for (auto& ni : newInst) {
+                            if (!ni->getName().empty()) { ni->setName(newName()); }
+                        }
 
-                    // replace arg
-                    //                    int j = 0;
-                    //
-                    //                    for (const auto& arg : callInst->getArgs()) {
-                    //                        if (argMap[j] == nullptr) {
-                    //                            j++;
-                    //                            continue;
-                    //                        }
-                    //                        *(argMap[j]) = arg;
-                    //                        j++;
-                    //                    }
-                    // rebuild use list
-                    for (const auto& ni : newInst) {
-                        for (auto nu : ni->getUseList()) {
-                            auto useInst = DPC(MiddleIRInst, *nu);
-                            if (old2new.find(useInst) != old2new.end()) {
-                                *nu = old2new[useInst];
-                                //                                ni->tryReplaceUse(*nu,
-                                //                                old2new[useInst]);
+                        // rebuild use list
+                        for (const auto& ni : newInst) {
+                            for (auto nu : ni->getUseList()) {
+                                auto useInst = DPC(MiddleIRInst, *nu);
+                                if (old2new.find(useInst) != old2new.end()) {
+                                    *nu = old2new[useInst];
+                                    //                                ni->tryReplaceUse(*nu,
+                                    //                                old2new[useInst]);
+                                }
                             }
                         }
-                    }
 
-                    // handle ret(by a batch of replace)
-                    auto retVal = oriRetInst->getOpVal();
-                    if (retVal != nullptr) {
-                        // replace
-                        auto newVal = retVal;
-                        if (auto retValInst = DPC(MiddleIRInst, retVal)) {
-                            newVal = old2new[retValInst];
-                        }
-                        // replace call's return with newVal;
-                        auto anotherIt = iit;
-                        for (anotherIt++; anotherIt != b->_instructions.end(); anotherIt++) {
-                            auto anotherI = *anotherIt;
-                            for (auto nu : anotherI->getUseList()) {
+                        // handle ret(by a batch of replace)
+                        auto retVal = oriRetInst->getOpVal();
+                        if (retVal != nullptr) {
+                            // replace
+                            auto newVal = retVal;
+                            if (auto retValInst = DPC(MiddleIRInst, retVal)) {
+                                newVal = old2new[retValInst];
+                            }
+                            // replace call's return with newVal;
+                            auto anotherIt = iit;
+                            for (anotherIt++; anotherIt != b->_instructions.end(); anotherIt++) {
+                                auto anotherI = *anotherIt;
+                                for (auto nu : anotherI->getUseList()) {
+                                    if (*nu == callInst) { *nu = newVal; }
+                                }
+                            }
+                            auto ter = b->getTerminator();
+                            for (auto nu : ter->getUseList()) {
                                 if (*nu == callInst) { *nu = newVal; }
                             }
                         }
-                        auto ter = b->getTerminator();
-                        for (auto nu : ter->getUseList()) {
-                            if (*nu == callInst) { *nu = newVal; }
+
+
+                        // move "ALLOCA" to another list.
+                        std::list<SP<MiddleIRInst>> newAllocaInsts;
+                        for (auto it = newInst.begin(); it != newInst.end();) {
+                            if (auto allocaInst = DPC(AllocaInst, *it)) {
+                                newAllocaInsts.push_back(*it);
+                                it = newInst.erase(it);
+                            } else {
+                                it++;
+                            }
                         }
+
+                        // erase callInst
+                        iit = b->_instructions.erase(iit);
+                        // start inline (insert newInst into
+                        b->_instructions.insert(iit, newInst.begin(), newInst.end());
+                        // add ALLOCA
+                        auto entry = f->getBasicBlock("LEntry");
+                        entry->_instructions.insert(
+                            entry->_instructions.begin(),
+                            newAllocaInsts.begin(),
+                            newAllocaInsts.end()
+                        );
+                        needContinue = true;
+                        break;
                     }
-
-
-                    // move "ALLOCA" to another list.
-                    std::list<SP<MiddleIRInst>> newAllocaInsts;
-                    for (auto it = newInst.begin(); it != newInst.end();) {
-                        if (auto allocaInst = DPC(AllocaInst, *it)) {
-                            newAllocaInsts.push_back(*it);
-                            it = newInst.erase(it);
-                        } else {
-                            it++;
-                        }
-                    }
-
-                    // erase callInst
-                    iit = b->_instructions.erase(iit);
-                    // start inline (insert newInst into
-                    b->_instructions.insert(iit, newInst.begin(), newInst.end());
-                    // add ALLOCA
-                    auto entry = f->getBasicBlock("LEntry");
-                    entry->_instructions.insert(
-                        entry->_instructions.begin(), newAllocaInsts.begin(), newAllocaInsts.end()
-                    );
                 }
-            }
+            } while (needContinue);
         }
     }
 }
