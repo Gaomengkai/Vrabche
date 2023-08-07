@@ -220,6 +220,7 @@ void R5FakeSeihai::emitFakeSeihai()
     // 差个@memset
     funcUsedReg["@memset"] = {a0, a1, a2};
     LOGD("FuncName: " << thisFunc->getName());
+    initArgRegOrStack();
     for (const auto& bb : thisFunc->getBasicBlocks()) {
         emitBB(bb);   // bbName and bb itself will be added Into blockStrangeFake in this func.
         LOGD(bbNames.back());
@@ -1047,18 +1048,21 @@ void R5FakeSeihai::handleArgStoreInst(
     auto storeInst  = dynamic_pointer_cast<StoreInst>(inst1);
     auto valType    = storeInst->getFrom()->getType()->type;
     auto fromName   = storeInst->getFrom()->getName();
+    auto fromIdx    = stoi(fromName.substr(5));
     auto toName     = storeInst->getTo()->getName();
     auto destOffset = queryStackSpace(toName);
+    bool onStack    = (argRegOrStack[fromIdx].index() == 1);
     if (valType == MiddleIR::MiddleIRType::INT || valType == MiddleIR::MiddleIRType::POINTER) {
         const auto saveInst = valType == MiddleIR::MiddleIRType::POINTER ? SD : SW;
         const auto loadInst = valType == MiddleIR::MiddleIRType::POINTER ? LD : LW;
-        if (funcIntArgCount < 8) {
+        if (!onStack) {
             // 将a0+funcIntArgCount
-            accessStack(sf, saveInst, R((YangReg)(a0 + funcIntArgCount)), destOffset, s0);
+            auto r = std::get<0>(argRegOrStack[fromIdx]);
+            accessStack(sf, saveInst, R(r), destOffset, s0);
         } else {
             // 来吧，**栈
             // 我们通过s0寻址
-            int64_t argOffs0 = funcStackArgCount * 8;
+            int64_t argOffs0 = std::get<1>(argRegOrStack[fromIdx]);
             auto    tmp      = V(E(), Pointer);
             accessStack(sf, loadInst, tmp, argOffs0, s0);
             accessStack(sf, saveInst, tmp, destOffset, s0);
@@ -1066,10 +1070,11 @@ void R5FakeSeihai::handleArgStoreInst(
         }
         funcIntArgCount++;
     } else if (valType == MiddleIR::MiddleIRType::FLOAT) {
-        if (funcFloatArgCount < 8) {
-            accessStack(sf, FSW, R((YangReg)(fa0 + funcFloatArgCount)), destOffset, s0);
+        if (!onStack) {
+            auto r = std::get<0>(argRegOrStack[fromIdx]);
+            accessStack(sf, FSW, R(r), destOffset, s0);
         } else {
-            int64_t argOffs0 = funcStackArgCount * 8;
+            int64_t argOffs0 = std::get<1>(argRegOrStack[fromIdx]);
             auto    tmp      = V(E(), Pointer);
             accessStack(sf, LW, tmp, argOffs0, s0);
             accessStack(sf, SW, tmp, destOffset, s0);
@@ -1298,7 +1303,16 @@ void R5FakeSeihai::handleIMathInst(
                     div_op2 >>= 1;
                     shift++;
                 }
-                sf.emplace_back(R5AsmStrangeFake(SRAIW, {rd, taichi1, N(shift)}));
+                // 注意：如果是负数就寄了。所以不能够直接右移。gcc的做法是：
+                // 1. 先sraiw 31位，得到-1或者0 (tmp = lhs >> 31)
+                // 2. 再srliw 32-shift位 (tmp = tmp >> (32-shift))
+                // 3. addw (rd = lhs + tmp)
+                // 4. sraiw shift位 (rd = rd >> shift)
+                auto tmp = V(E(), Int);
+                sf.emplace_back(R5AsmStrangeFake(SRAIW, {tmp, taichi1, N(31)}));
+                sf.emplace_back(R5AsmStrangeFake(SRLIW, {tmp, tmp, N(32 - shift)}));
+                sf.emplace_back(R5AsmStrangeFake(ADDW, {rd, taichi1, tmp}));
+                sf.emplace_back(R5AsmStrangeFake(SRAIW, {rd, rd, N(shift)}));
                 break;
             }
         }
@@ -1407,6 +1421,31 @@ void R5FakeSeihai::accessStackWithTmp(
         sf.emplace_back(R5AsmStrangeFake(LI, {R(tmp), P(offset)}));
         sf.emplace_back(R5AsmStrangeFake(ADD, {R(tmp), R(tmp), R(st)}));
         sf.emplace_back(R5AsmStrangeFake(op, {op1, P(0), R(tmp)}));
+    }
+}
+void R5FakeSeihai::initArgRegOrStack()
+{
+    YangReg iReg        = a0;
+    YangReg fReg        = fa0;
+    int64_t stackOffset = 0;
+    for (const auto& t : thisFunc->getParamsTypes()) {
+        if (t->isFloat()) {
+            if (fReg <= fa7) {
+                this->argRegOrStack.push_back(fReg);
+                fReg = (YangReg)((int)fReg + 1);
+            } else {
+                this->argRegOrStack.push_back(stackOffset);
+                stackOffset += 8;
+            }
+        } else {
+            if (iReg <= a7) {
+                this->argRegOrStack.push_back(iReg);
+                iReg = (YangReg)((int)iReg + 1);
+            } else {
+                this->argRegOrStack.push_back(stackOffset);
+                stackOffset += 8;
+            }
+        }
     }
 }
 

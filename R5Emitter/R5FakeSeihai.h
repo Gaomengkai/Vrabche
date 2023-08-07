@@ -11,10 +11,13 @@
 #include "MiddleIRFuncDef.h"
 #include "R5TaichiMap.h"
 #include "MiddleIRAST.h"
+#include <variant>
+using std::variant;
 using namespace MiddleIR;
 
 namespace R5Emitter
 {
+// 一个函数级别的虚拟IR和寄存器分配器。
 class R5FakeSeihai
 {
 public:
@@ -70,6 +73,11 @@ private:
 
     const std::shared_ptr<MiddleIRFuncDef>& thisFunc;
     const std::shared_ptr<MiddleIRAST>&     ast;
+
+    // 0807重构：用于去除没用的参数store操作
+    using RegOrStack = variant<YangReg, int64_t>;
+    std::vector<RegOrStack> argRegOrStack;
+    void                    initArgRegOrStack();
 
     void emitBB(const std::shared_ptr<MiddleIRBasicBlock>& bb);
 

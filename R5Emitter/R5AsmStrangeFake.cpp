@@ -133,6 +133,7 @@ string R5AsmStrangeFake::FakeOPToString(FakeOPs op)
     case NEG: return "neg";
     case SRAIW: return "sraiw";
     case SLLIW: return "slliw";
+    case SRLIW: return "srliw";
     }
     return "{Unknown FakeOP} " + std::to_string(op);
 }
