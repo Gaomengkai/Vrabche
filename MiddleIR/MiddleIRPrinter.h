@@ -38,7 +38,9 @@ inline string printInst(const shared_ptr<MiddleIRInst>& sharedPtr)
     case MiddleIRInst::BitCastInst: instName = "BITCAST"; break;
     case MiddleIRInst::GetElementPtrInst: instName = "GETELEMENTPTR"; break;
     case MiddleIRInst::ConvertInst: instName = "CONVERT"; break;
-    case MiddleIRInst::CallInst: instName = "CALL"; break;
+    case MiddleIRInst::CallInst:
+        instName = "CALL" + DPC(CallInst, sharedPtr)->getFunc()->getName();
+        break;
     }
     string instRet = sharedPtr->getName();
     string instArgs;

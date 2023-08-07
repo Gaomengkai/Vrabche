@@ -8,14 +8,20 @@
 
 namespace MiddleIR::Optimizer
 {
-
+using SPFDef = shared_ptr<MiddleIRFuncDef>;
+template<class T>
+using SP = shared_ptr<T>;
 class IROptInline : IROptimizerBase
 {
 public:
     explicit IROptInline(shared_ptr<MiddleIR::MiddleIRAST> irast);
     ~IROptInline() override = default;
     void run() override;
-    void inlineFunc(const shared_ptr<MiddleIRFuncDef>& f);
+    void inlineSimpleFunc(const SPFDef& toInlineF);
+
+private:
+    int         _iid = 0;
+    std::string newName();
 };
 
 } // namespace MiddleIR::Optimizer
