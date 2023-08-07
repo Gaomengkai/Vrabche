@@ -139,18 +139,19 @@ void IROptDCE2::run()
                 if (isUseless[inst]) {
                     inst->setDeleted(true);
                     hasChanged = true;
-                    std::cout << "del ";
-                    if (auto store = dynamic_pointer_cast<StoreInst>(inst)) {
-                        std::cout << "store " << store->getFrom()->getName() << "->"
-                                  << store->getTo()->getName() << std::endl;
-                    } else
-                        std::cout << inst->getName() << std::endl;
+                    //                    std::cout << "del ";
+                    //                    if (auto store = dynamic_pointer_cast<StoreInst>(inst)) {
+                    //                        std::cout << "store " << store->getFrom()->getName()
+                    //                        << "->"
+                    //                                  << store->getTo()->getName() << std::endl;
+                    //                    } else
+                    //                        std::cout << inst->getName() << std::endl;
                 }
             }
             // 真删除
             bb->_instructions.remove_if([](const SPInst& inst) { return inst->isDeleted(); });
             // 结果：
-            std::cout << bb->_instructions.size() << std::endl;
+            //            std::cout << bb->_instructions.size() << std::endl;
         }
 
 
