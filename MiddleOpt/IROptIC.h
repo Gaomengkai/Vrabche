@@ -52,10 +52,16 @@ public:
             _opSon = op2->getIMathOp();
         }
     };
-    bool couldCombine() {
-        bool strangeFake = (_val00.first->isConst() + _val01.first->isConst() + _val10.first->isConst() + _val11.first->isConst() == 3) && (_op == _opSon|| (_opSon == IMathInst::IMathOp::ADD && _op == IMathInst::IMathOp::SUB) || (_opSon == IMathInst::IMathOp::SUB && _op == IMathInst::IMathOp::ADD));
-        if (strangeFake) LOGW("could combine, now combine");
-        else LOGW("not strange fake");
+    bool couldCombine()
+    {
+        bool strangeFake = (_val00.first->isConst() + _val01.first->isConst() +
+                                _val10.first->isConst() + _val11.first->isConst() ==
+                            3) &&
+                           (_op == _opSon ||
+                            (_opSon == IMathInst::IMathOp::ADD && _op == IMathInst::IMathOp::SUB) ||
+                            (_opSon == IMathInst::IMathOp::SUB && _op == IMathInst::IMathOp::ADD));
+        //        if (strangeFake) LOGW("could combine, now combine");
+        //        else LOGW("not strange fake");
         return strangeFake;
     }
     std::pair<SPVal, SPVal> combine() {

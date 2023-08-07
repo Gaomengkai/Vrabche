@@ -229,7 +229,7 @@ void IROptCP::For1Func(const shared_ptr<MiddleIRFuncDef>& func)
         }
         hasChanged |= IROptCF::ConstFold(b);
     }
-    LOGW("CP Done.");
+    //    LOGW("CP Done.");
 }
 void IROptCP::printIt(
     unordered_map<SP<MiddleIRBasicBlock>, std::unordered_map<SP<AllocaInst>, FakeConst>>&

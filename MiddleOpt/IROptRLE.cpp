@@ -13,20 +13,33 @@ void IROptRLE::run()
     hasChanged = false;
     for (auto& func : _irast->funcDefs) {
         for (auto& bb : func->getBasicBlocks()) {
-            using Helios = MiddleIRVal;
-            std::unordered_map<SP<Helios>, SP<MiddleIRVal>>            map1;
-            std::unordered_map<SP<Helios>, std::list<SP<MiddleIRVal>>> map2;
+            using Apollo = AllocaInst;   // 此处不做改动
+            using Athena =
+                MiddleIRVal;   // 这里用于记录全局的变量。由于全局变量通过call时有可能变化，所以。
+
+            std::unordered_map<SP<Apollo>, SP<MiddleIRVal>>            map1;
+            std::unordered_map<SP<Apollo>, std::list<SP<MiddleIRVal>>> map2;
             std::unordered_map<SP<MiddleIRVal>, SP<MiddleIRVal>>       map3;
+            std::unordered_map<SP<Athena>, SP<MiddleIRVal>>            map4;
+            std::unordered_map<SP<Athena>, std::list<SP<MiddleIRVal>>> map5;
             for (auto& i : bb->_instructions) {
                 if (auto loadInst = DPC(LoadInst, i)) {
                     auto from = loadInst->getFrom();
-                    if (auto fromAlloca = DPC(Helios, from)) {
+                    if (auto fromAlloca = DPC(Apollo, from)) {
                         if (auto it1 = map1.find(fromAlloca); it1 != map1.end()) {
                             map2[fromAlloca].push_back(loadInst);
                             map3[loadInst] = it1->second;
                             i->setDeleted();
                         } else {
                             map1[fromAlloca] = loadInst;
+                        }
+                    } else if (auto fromGlobal = DPC(Athena, from)) {
+                        if (auto it1 = map4.find(fromGlobal); it1 != map4.end()) {
+                            map5[fromGlobal].push_back(loadInst);
+                            map3[loadInst] = it1->second;
+                            i->setDeleted();
+                        } else {
+                            map4[fromGlobal] = loadInst;
                         }
                     }
                 } else {
@@ -42,13 +55,31 @@ void IROptRLE::run()
                             continue;
                         }
                         auto to = storeInst->getTo();
-                        if (auto toAlloca = DPC(Helios, to)) {
+                        if (auto toAlloca = DPC(Apollo, to)) {
                             if (auto it1 = map1.find(toAlloca); it1 != map1.end()) {
-                                for (const auto& k1 : map2[toAlloca]) { map3.erase(k1); }
+                                //                                for (const auto& k1 :
+                                //                                map2[toAlloca]) { map3.erase(k1);
+                                //                                }
                                 map2.erase(toAlloca);
                             }
                             map1[toAlloca] = from;
+                        } else if (auto toGlobal = DPC(Athena, to)) {
+                            if (auto it1 = map4.find(toGlobal); it1 != map4.end()) {
+                                //                                for (const auto& k1 :
+                                //                                map5[toGlobal]) { map3.erase(k1);
+                                //                                }
+                                map5.erase(toGlobal);
+                            }
+                            map4[toGlobal] = from;
                         }
+                    } else if (i->isCallInst()) {
+                        // 清除所有贮存的雅典娜
+                        for (auto& [k1, v1] : map4) {
+                            //                            for (const auto& k2 : map5[k1]) {
+                            //                            map3.erase(k2); }
+                            map5.erase(k1);
+                        }
+                        map4.clear();
                     }
                 }
             }

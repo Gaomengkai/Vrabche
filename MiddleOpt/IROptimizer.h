@@ -16,6 +16,9 @@
 #include "IROptRSE.h"
 #include "IROptGV2C.h"
 
+#include "MiddleIRPrinter.h"
+#include "IROptInline.h"
+
 namespace MiddleIR::Optimizer
 {
 class IROptimizer
@@ -29,7 +32,7 @@ public:
         OPT_DCE1                         = 0x8,
         COMMON_SUBEXPRESSION_ELIMINATION = 0x10,
         LOOP_OPTIMIZATION                = 0x20,
-        FUNCTION_INLINE                  = 0x40,
+        OPT_INLINE                       = 0x40,
         NONE_OPTIMIZATION                = 0x80,
         OPT_RLE                          = 0x100,
         INSTRUCTION_COMBINE              = 0x200,
@@ -65,6 +68,27 @@ public:
                 optimizer->run();
                 LOGW("Opt " << i << "done. Has changed: " << optimizer->hasChanged);
                 hasChanged |= optimizer->hasChanged;
+                //                for(auto &f : _irast->funcDefs) {
+                //                    for(auto &b:f->getBasicBlocks()) {
+                //                        std::cout<<printBB(b)<<std::endl;
+                //                    }
+                //                }
+            }
+        } while (hasChanged);
+        auto inLine = new IROptInline(_irast);
+        inLine->run();
+        do {
+            hasChanged = false;
+            for (auto i = 0; i < _optimizers.size(); i++) {
+                auto& optimizer = _optimizers[i];
+                optimizer->run();
+                LOGW("Opt " << i << "done. Has changed: " << optimizer->hasChanged);
+                hasChanged |= optimizer->hasChanged;
+                //                for(auto &f : _irast->funcDefs) {
+                //                    for(auto &b:f->getBasicBlocks()) {
+                //                        std::cout<<printBB(b)<<std::endl;
+                //                    }
+                //                }
             }
         } while (hasChanged);
     }
