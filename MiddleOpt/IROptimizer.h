@@ -15,6 +15,7 @@
 #include "IROptIC.h"
 #include "IROptRSE.h"
 #include "IROptGV2C.h"
+#include "IROptCSE.h"
 
 #include "MiddleIRPrinter.h"
 #include "IROptInline.h"
@@ -42,6 +43,7 @@ public:
         OPT_IC                           = 0x2000,
         OPT_RSE                          = 0x4000,
         OPT_GV2C                         = 0x8000,
+        OPT_CSE                          = 0x10000,
         ALL                              = (uint64_t)-1
     } enabledOpt           = O0;
     virtual ~IROptimizer() = default;
@@ -57,6 +59,7 @@ public:
         if (OPT_DCE2 & enabledOpt) { _optimizers.push_back(new IROptDCE2(irast_)); }
         if (OPT_IC & enabledOpt) { _optimizers.push_back(new IROptIC(irast_)); }
         if (OPT_RSE & enabledOpt) { _optimizers.push_back(new IROptRSE(irast_)); }
+        if (OPT_CSE & enabledOpt) { _optimizers.push_back(new IROptCSE(irast_)); }
     }
     virtual void run()
     {
@@ -103,6 +106,12 @@ public:
             }
             tcnt++;
         } while (hasChanged);
+        auto after = std::ofstream("../testsrc/allafter.txt");
+        for (const auto& f : _irast->funcDefs) {
+            after << "FUNC " << f->getName() << std::endl;
+            for (auto& b : f->getBasicBlocks()) { after << printBB(b) << std::endl; }
+        }
+        after.close();
     }
 
 protected:
