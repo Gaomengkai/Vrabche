@@ -19,6 +19,7 @@
 
 #include "MiddleIRPrinter.h"
 #include "IROptInline.h"
+#include "IROptA2M.h"
 
 namespace MiddleIR::Optimizer
 {
@@ -44,6 +45,7 @@ public:
         OPT_RSE                          = 0x4000,
         OPT_GV2C                         = 0x8000,
         OPT_CSE                          = 0x10000,
+        OPT_A2M                          = 0x20000,
         ALL                              = (uint64_t)-1
     } enabledOpt           = O0;
     virtual ~IROptimizer() = default;
@@ -60,6 +62,7 @@ public:
         if (OPT_IC & enabledOpt) { _optimizers.push_back(new IROptIC(irast_)); }
         if (OPT_RSE & enabledOpt) { _optimizers.push_back(new IROptRSE(irast_)); }
         if (OPT_CSE & enabledOpt) { _optimizers.push_back(new IROptCSE(irast_)); }
+        if (OPT_A2M & enabledOpt) { _optimizers.push_back(new IROptA2M(irast_)); }
     }
     virtual void run()
     {
