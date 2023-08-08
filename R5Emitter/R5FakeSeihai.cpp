@@ -1025,7 +1025,10 @@ void R5FakeSeihai::handleStoreInst(
         // 此时立即数已经在rs里了。
     } else {
         // 变量
-        rs = V(from->getName(), isFloat ? Float : Int);
+        auto vType = Int;
+        if (isFloat) vType = Float;
+        if (from->getType()->isPointer()) vType = Pointer;
+        rs = V(from->getName(), vType);
     }
     if (onStack) {
         int64_t of = (dynamic_pointer_cast<R5Lai64>(rt))->value;
