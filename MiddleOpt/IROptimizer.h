@@ -68,28 +68,40 @@ public:
                 optimizer->run();
                 LOGW("Opt " << i << "done. Has changed: " << optimizer->hasChanged);
                 hasChanged |= optimizer->hasChanged;
-                //                for(auto &f : _irast->funcDefs) {
-                //                    for(auto &b:f->getBasicBlocks()) {
-                //                        std::cout<<printBB(b)<<std::endl;
-                //                    }
-                //                }
             }
         } while (hasChanged);
-        auto inLine = new IROptInline(_irast);
-        inLine->run();
+        if (OPT_INLINE & enabledOpt) {
+            auto inLine = new IROptInline(_irast);
+            inLine->run();
+        }
+        int tcnt = 1;
         do {
             hasChanged = false;
             for (auto i = 0; i < _optimizers.size(); i++) {
+                int pause = 1;
+                // if (i == pause) {
+                //     auto before = std::ofstream("../testsrc/"+std::to_string(tcnt)+"before.txt");
+                //     for (const auto& f : _irast->funcDefs) {
+                //         before << "FUNC " << f->getName() << std::endl;
+                //         for (auto& b : f->getBasicBlocks()) { before << printBB(b) << std::endl;
+                //         }
+                //     }
+                //     before.close();
+                // }
                 auto& optimizer = _optimizers[i];
                 optimizer->run();
                 LOGW("Opt " << i << "done. Has changed: " << optimizer->hasChanged);
                 hasChanged |= optimizer->hasChanged;
-                //                for(auto &f : _irast->funcDefs) {
-                //                    for(auto &b:f->getBasicBlocks()) {
-                //                        std::cout<<printBB(b)<<std::endl;
-                //                    }
-                //                }
+                // if (i == pause) {
+                //     auto after  = std::ofstream("../testsrc/"+std::to_string(tcnt)+"after.txt");
+                //     for (const auto& f : _irast->funcDefs) {
+                //         after << "FUNC " << f->getName() << std::endl;
+                //         for (auto& b : f->getBasicBlocks()) { after << printBB(b) << std::endl; }
+                //     }
+                //     after.close();
+                // }
             }
+            tcnt++;
         } while (hasChanged);
     }
 
