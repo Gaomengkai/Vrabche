@@ -148,7 +148,7 @@ void R5FakeSeihai::emitStream(std::ostream& os)
     for (auto reg : totalUsedReg) {
         if (reg == ra || reg == s0) continue;
         auto offset = availableCalleeSavedRegStartOffset + 8 * j;
-        if(R5Yang::isFloatReg(reg))
+        if (R5Yang::isFloatReg(reg))
             accessStackWithTmp(fh, FSW, R(reg), offset, s0, t1);
         else
             accessStackWithTmp(fh, SD, R(reg), offset, s0, t1);
@@ -162,7 +162,7 @@ void R5FakeSeihai::emitStream(std::ostream& os)
     for (auto reg : totalUsedReg) {
         if (reg == ra || reg == s0) continue;
         auto offset = availableCalleeSavedRegStartOffset + 8 * j;
-        if(R5Yang::isFloatReg(reg))
+        if (R5Yang::isFloatReg(reg))
             accessStackWithTmp(fh, FLW, R(reg), offset, s0, t1);
         else
             accessStackWithTmp(fh, LD, R(reg), offset, s0, t1);
@@ -219,10 +219,11 @@ void R5FakeSeihai::emitFakeSeihai()
     }
     // 差个@memset
     funcUsedReg["@memset"] = {a0, a1, a2};
-    LOGW("FuncName: " << thisFunc->getName());
+    LOGD("FuncName: " << thisFunc->getName());
+    initArgRegOrStack();
     for (const auto& bb : thisFunc->getBasicBlocks()) {
         emitBB(bb);   // bbName and bb itself will be added Into blockStrangeFake in this func.
-        LOGW(bbNames.back());
+        LOGD(bbNames.back());
         for (auto& i : blockStrangeFake.back()) { LOGD(i.toString(true)); }
     }
 
@@ -643,7 +644,7 @@ void R5FakeSeihai::handleGEPInst(
     }
     if (immSoFar) {
         // 还有待处理的立即数。
-        if(couldLoadWithRegImm(offset))
+        if (couldLoadWithRegImm(offset))
             sf.emplace_back(R5AsmStrangeFake(ADDI, {to, base, P(offset)}));
         else {
             auto t = V(E(), Pointer);
@@ -1024,7 +1025,10 @@ void R5FakeSeihai::handleStoreInst(
         // 此时立即数已经在rs里了。
     } else {
         // 变量
-        rs = V(from->getName(), isFloat ? Float : Int);
+        auto vType = Int;
+        if (isFloat) vType = Float;
+        if (from->getType()->isPointer()) vType = Pointer;
+        rs = V(from->getName(), vType);
     }
     if (onStack) {
         int64_t of = (dynamic_pointer_cast<R5Lai64>(rt))->value;
@@ -1047,18 +1051,21 @@ void R5FakeSeihai::handleArgStoreInst(
     auto storeInst  = dynamic_pointer_cast<StoreInst>(inst1);
     auto valType    = storeInst->getFrom()->getType()->type;
     auto fromName   = storeInst->getFrom()->getName();
+    auto fromIdx    = stoi(fromName.substr(5));
     auto toName     = storeInst->getTo()->getName();
     auto destOffset = queryStackSpace(toName);
+    bool onStack    = (argRegOrStack[fromIdx].index() == 1);
     if (valType == MiddleIR::MiddleIRType::INT || valType == MiddleIR::MiddleIRType::POINTER) {
         const auto saveInst = valType == MiddleIR::MiddleIRType::POINTER ? SD : SW;
         const auto loadInst = valType == MiddleIR::MiddleIRType::POINTER ? LD : LW;
-        if (funcIntArgCount < 8) {
+        if (!onStack) {
             // 将a0+funcIntArgCount
-            accessStack(sf, saveInst, R((YangReg)(a0 + funcIntArgCount)), destOffset, s0);
+            auto r = std::get<0>(argRegOrStack[fromIdx]);
+            accessStack(sf, saveInst, R(r), destOffset, s0);
         } else {
             // 来吧，**栈
             // 我们通过s0寻址
-            int64_t argOffs0 = funcStackArgCount * 8;
+            int64_t argOffs0 = std::get<1>(argRegOrStack[fromIdx]);
             auto    tmp      = V(E(), Pointer);
             accessStack(sf, loadInst, tmp, argOffs0, s0);
             accessStack(sf, saveInst, tmp, destOffset, s0);
@@ -1066,10 +1073,11 @@ void R5FakeSeihai::handleArgStoreInst(
         }
         funcIntArgCount++;
     } else if (valType == MiddleIR::MiddleIRType::FLOAT) {
-        if (funcFloatArgCount < 8) {
-            accessStack(sf, FSW, R((YangReg)(fa0 + funcFloatArgCount)), destOffset, s0);
+        if (!onStack) {
+            auto r = std::get<0>(argRegOrStack[fromIdx]);
+            accessStack(sf, FSW, R(r), destOffset, s0);
         } else {
-            int64_t argOffs0 = funcStackArgCount * 8;
+            int64_t argOffs0 = std::get<1>(argRegOrStack[fromIdx]);
             auto    tmp      = V(E(), Pointer);
             accessStack(sf, LW, tmp, argOffs0, s0);
             accessStack(sf, SW, tmp, destOffset, s0);
@@ -1193,7 +1201,7 @@ void R5FakeSeihai::handleIMathInst(
     if (op1->isConst())
         taichi1 = N(std::dynamic_pointer_cast<R5IRValConstInt>(op1)->getValue());   // const LAI
     else
-        taichi1 = V(op1->getName(), Int);   // var YIN
+        taichi1 = V(op1->getName(), Int);                                           // var YIN
     auto op2 = math->getOpVal2();
     if (op2->isConst())
         taichi2 = N(std::dynamic_pointer_cast<R5IRValConstInt>(op2)->getValue());
@@ -1250,6 +1258,31 @@ void R5FakeSeihai::handleIMathInst(
     case IMathInst::IMathOp::MUL: {
         // 乘法要求两个操作数都是寄存器
         // 不是的话，就要先把立即数装载到寄存器里
+        // 闲着也是闲着，可以把*2, *4 *8等等情况优化掉
+        if (taichi1->isLai() & taichi2->isYin()) S(taichi2, taichi1);
+        if (taichi2->isLai() & taichi1->isYin()) {
+            // 有可能是乘以2的幂
+            int num = std::static_pointer_cast<R5Lai>(taichi2)->value;
+            // 乘以负数的话，先把负号提出来
+            if (num > 0) {
+                if (num == 1) {
+                    sf.emplace_back(R5AsmStrangeFake(MV, {rd, taichi1}));
+                    break;
+                } else {
+                    int log2 = 0;
+                    while (num % 2 == 0) {
+                        num /= 2;
+                        log2++;
+                    }
+                    if (num == 1) {
+                        sf.emplace_back(R5AsmStrangeFake(SLLIW, {rd, taichi1, N(log2)}));
+                        break;
+                    }
+                }
+            } else if (num == 0) {
+                sf.emplace_back(R5AsmStrangeFake(ADDIW, {rd, R(zero), N(0)}));
+            }   // 小于0的不处理。懒得写了。
+        }
         if (taichi1->isLai()) {
             auto tmp = V(E(), Int);
             sf.emplace_back(R5AsmStrangeFake(LI, {tmp, taichi1}));
@@ -1264,6 +1297,28 @@ void R5FakeSeihai::handleIMathInst(
     } break;
 
     case IMathInst::IMathOp::SDIV: {
+        // 专为除以2的幂优化
+        if (taichi1->isYin() && taichi2->isLai()) {
+            auto div_op2 = dynamic_pointer_cast<R5Lai>(taichi2)->value;
+            if (div_op2 > 0 && (div_op2 & (div_op2 - 1)) == 0) {
+                int shift = 0;
+                while (div_op2 > 1) {
+                    div_op2 >>= 1;
+                    shift++;
+                }
+                // 注意：如果是负数就寄了。所以不能够直接右移。gcc的做法是：
+                // 1. 先sraiw 31位，得到-1或者0 (tmp = lhs >> 31)
+                // 2. 再srliw 32-shift位 (tmp = tmp >> (32-shift))
+                // 3. addw (rd = lhs + tmp)
+                // 4. sraiw shift位 (rd = rd >> shift)
+                auto tmp = V(E(), Int);
+                sf.emplace_back(R5AsmStrangeFake(SRAIW, {tmp, taichi1, N(31)}));
+                sf.emplace_back(R5AsmStrangeFake(SRLIW, {tmp, tmp, N(32 - shift)}));
+                sf.emplace_back(R5AsmStrangeFake(ADDW, {rd, taichi1, tmp}));
+                sf.emplace_back(R5AsmStrangeFake(SRAIW, {rd, rd, N(shift)}));
+                break;
+            }
+        }
         // 除法要求两个操作数都是寄存器
         // 不是的话，就要先把立即数装载到寄存器里
         if (taichi1->isLai()) {
@@ -1369,6 +1424,31 @@ void R5FakeSeihai::accessStackWithTmp(
         sf.emplace_back(R5AsmStrangeFake(LI, {R(tmp), P(offset)}));
         sf.emplace_back(R5AsmStrangeFake(ADD, {R(tmp), R(tmp), R(st)}));
         sf.emplace_back(R5AsmStrangeFake(op, {op1, P(0), R(tmp)}));
+    }
+}
+void R5FakeSeihai::initArgRegOrStack()
+{
+    YangReg iReg        = a0;
+    YangReg fReg        = fa0;
+    int64_t stackOffset = 0;
+    for (const auto& t : thisFunc->getParamsTypes()) {
+        if (t->isFloat()) {
+            if (fReg <= fa7) {
+                this->argRegOrStack.push_back(fReg);
+                fReg = (YangReg)((int)fReg + 1);
+            } else {
+                this->argRegOrStack.push_back(stackOffset);
+                stackOffset += 8;
+            }
+        } else {
+            if (iReg <= a7) {
+                this->argRegOrStack.push_back(iReg);
+                iReg = (YangReg)((int)iReg + 1);
+            } else {
+                this->argRegOrStack.push_back(stackOffset);
+                stackOffset += 8;
+            }
+        }
     }
 }
 

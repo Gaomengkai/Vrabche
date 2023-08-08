@@ -76,10 +76,13 @@ public:
         for (const auto& bb : this->_basicBlocks) {
             auto ter = bb->getTerminator();
             if (ter->isBrInst()) {
-                auto br = std::dynamic_pointer_cast<BrInst>(ter);
-                br->getIfTrue()->addPrev(bb);
-                if (br->getIfFalse()) { br->getIfFalse()->addPrev(bb); }
-                bb->addNext(br->getIfTrue());
+                auto brInst = std::dynamic_pointer_cast<BrInst>(ter);
+                brInst->getIfTrue()->addPrev(bb);
+                bb->addNext(brInst->getIfTrue());
+                if (brInst->getIfFalse()) {
+                    brInst->getIfFalse()->addPrev(bb);
+                    bb->addNext(brInst->getIfFalse());
+                }
             }
         }
     }

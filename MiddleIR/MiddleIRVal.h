@@ -78,6 +78,7 @@ public:
 };
 #define IR_INT_CONST(_VAL) std::make_shared<R5IRValConstInt>(_VAL)
 
+// 注意，在前端生成的代码中，根本不会出现一个bool单独的东西，比如true,false
 class R5IRValConstI1 : public R5IRValConst
 {
 public:

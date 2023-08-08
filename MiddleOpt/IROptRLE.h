@@ -9,10 +9,11 @@
 namespace MiddleIR::Optimizer
 {
 
-class RedundantLoadEliminationOptimizer : public IROptimizerBase
+
+class IROptRLE : public IROptimizerBase
 {
 public:
-    explicit RedundantLoadEliminationOptimizer(const shared_ptr<MiddleIRAST>& irast_)
+    explicit IROptRLE(const shared_ptr<MiddleIRAST>& irast_)
         : IROptimizerBase(irast_)
     {
     }

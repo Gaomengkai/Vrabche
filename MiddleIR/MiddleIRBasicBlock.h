@@ -22,6 +22,7 @@ private:
 
 public:
     std::list<std::shared_ptr<MiddleIRInst>> _instructions;
+    [[nodiscard]] auto&                      getInstructions() const { return _instructions; }
     explicit MiddleIRBasicBlock(std::string name_)
         : _name(std::move(name_))
     {

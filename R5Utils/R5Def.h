@@ -27,5 +27,6 @@ using std::vector;
 
 #define ACS(_ST, _TARG) std::any_cast<shared_ptr<_ST>>((_TARG))
 #define DPC(_ST, _TARG) std::dynamic_pointer_cast<_ST>((_TARG))
+#define SPC(_ST, _TARG) std::static_pointer_cast<_ST>((_TARG))
 
 #endif   // IRBACKENDR5_R5DEF_H

@@ -41,7 +41,8 @@ int64_t R5TaichiMap::allocateImpl(const std::string& variableName, int64_t size)
                     newBlock->allocated = true;
                     auto prevBlock = new MemoryBlock((*it)->address, alignedAddr - (*it)->address);
                     auto nextBlock = new MemoryBlock(
-                        alignedAddr + alignedSize, (*it)->size - alignedAddr + (*it)->address
+                        alignedAddr + alignedSize,
+                        (*it)->size + (*it)->address - alignedAddr - alignedSize
                     );
                     // 使用以上三个块来替换当前块
                     memory.insert(it, prevBlock);
@@ -50,7 +51,7 @@ int64_t R5TaichiMap::allocateImpl(const std::string& variableName, int64_t size)
                     // 插入新块
                     it                        = memory.insert(it, newBlock);
                     allocations[variableName] = (*it);
-                    if (nextBlock->size >= 0) {
+                    if (nextBlock->size > 0) {
                         // 如果后面的块大小大于0，那么插入后面的块
                         memory.insert(it, nextBlock);
                     } else {
@@ -67,7 +68,7 @@ int64_t R5TaichiMap::allocateImpl(const std::string& variableName, int64_t size)
                 it = memory.erase(it);
                 it--;
                 allocations[variableName] = (*it);
-                if (nextBlock->size >= 0) {
+                if (nextBlock->size > 0) {
                     // 如果后面的块大小大于0，那么插入后面的块
                     memory.insert(std::next(it), nextBlock);
                 } else
