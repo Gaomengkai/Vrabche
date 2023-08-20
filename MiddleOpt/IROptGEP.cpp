@@ -47,10 +47,10 @@ bool MiddleIR::Optimizer::IROptGEP::runOnBB(const shared_ptr<MiddleIRBasicBlock>
                 for (int j = 0; j < i->getIndex().size() - 1; j++) {
                     int64_t curShapeSizeBytes = 0;
                     if (auto aType1 = std::dynamic_pointer_cast<ArrayType>(type1)) {
-                        curShapeSizeBytes = (int64_t)aType1->getSizeBytes();
+                        curShapeSizeBytes = (int64_t)aType1->getSizeBytes()/4;
                         type1             = aType1->getElementType();
                     } else {
-                        curShapeSizeBytes = 4;
+                        curShapeSizeBytes = 1;
                     }
                     //先算出偏移量
                     auto mul_ = make_shared<IMathInst>(IMathInst::IMathOp::MUL, make_shared<IntType>(32), i->getIndex()[j], IR_INT_CONST(curShapeSizeBytes));
