@@ -793,7 +793,12 @@ void R5FakeSeihai::handleBitcastInst(
             sf.emplace_back(R5AsmStrangeFake(ADD, {V(to, Pointer), R(s0), tmp}));
         }
     } else {
-        sf.emplace_back(R5AsmStrangeFake(MV, {V(to, Pointer), V(from, Pointer)}));
+        auto op = MV;
+        if(from[0]=='@') {
+            op=LLA;
+            from = from.substr(1);
+        }
+        sf.emplace_back(R5AsmStrangeFake(op, {V(to, Pointer), V(from, Pointer)}));
     }
 }
 void R5FakeSeihai::handleCvtInst(
