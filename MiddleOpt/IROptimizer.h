@@ -70,45 +70,46 @@ public:
     virtual void run()
     {
         bool hasChanged;
+        int  tcnt  = 1;
+        int  pause = -1;
+        bool once  = true;
         do {
             hasChanged = false;
             for (auto i = 0; i < _optimizers.size(); i++) {
                 auto& optimizer = _optimizers[i];
+                if (i == pause) {
+                    auto before =
+                        std::ofstream("../testsrc/" + std::to_string(tcnt) + "before.txt");
+                    for (const auto& f : _irast->funcDefs) {
+                        before << "FUNC " << f->getName() << std::endl;
+                        for (auto& b : f->getBasicBlocks()) { before << printBB(b) << std::endl; }
+                    }
+                    before.close();
+                }
                 optimizer->run();
-                // LOGW("Opt " << i << "done. Has changed: " << optimizer->hasChanged);
                 hasChanged |= optimizer->hasChanged;
+                if (i == pause) {
+                    once        = false;
+                    auto before = std::ofstream("../testsrc/" + std::to_string(tcnt) + "after.txt");
+                    for (const auto& f : _irast->funcDefs) {
+                        before << "FUNC " << f->getName() << std::endl;
+                        for (auto& b : f->getBasicBlocks()) { before << printBB(b) << std::endl; }
+                    }
+                    before.close();
+                    tcnt++;
+                }
             }
         } while (hasChanged);
         if (OPT_INLINE & enabledOpt) {
             auto inLine = new IROptInline(_irast);
             inLine->run();
         }
-        int tcnt = 1;
         do {
             hasChanged = false;
             for (auto i = 0; i < _optimizers.size(); i++) {
-                int pause = 1;
-                // if (i == pause) {
-                //     auto before = std::ofstream("../testsrc/"+std::to_string(tcnt)+"before.txt");
-                //     for (const auto& f : _irast->funcDefs) {
-                //         before << "FUNC " << f->getName() << std::endl;
-                //         for (auto& b : f->getBasicBlocks()) { before << printBB(b) << std::endl;
-                //         }
-                //     }
-                //     before.close();
-                // }
                 auto& optimizer = _optimizers[i];
                 optimizer->run();
-                // LOGW("Opt " << i << "done. Has changed: " << optimizer->hasChanged);
                 hasChanged |= optimizer->hasChanged;
-                // if (i == pause) {
-                //     auto after  = std::ofstream("../testsrc/"+std::to_string(tcnt)+"after.txt");
-                //     for (const auto& f : _irast->funcDefs) {
-                //         after << "FUNC " << f->getName() << std::endl;
-                //         for (auto& b : f->getBasicBlocks()) { after << printBB(b) << std::endl; }
-                //     }
-                //     after.close();
-                // }
             }
             tcnt++;
         } while (hasChanged);

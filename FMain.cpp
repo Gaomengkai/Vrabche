@@ -60,7 +60,7 @@ void RISC_V_Backend(std::istream& in, std::ostream& out)
     auto     irAST       = visitor->getAST();
     auto     SPCopiedAST = make_shared<MiddleIRAST>(irAST);
     uint64_t opt;
-    uint64_t newOpt = IROptimizer::OPT_INLINE;
+    uint64_t newOpt = IROptimizer::OPT_GET;
     if (optimizationLevel.empty()) {
         opt = IROptimizer::O0;
     } else if (optimizationLevel == "-Otest") {

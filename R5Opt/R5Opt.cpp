@@ -19,7 +19,7 @@ void R5Opt::delAdd0(vector<R5AsmStrangeFake>& b)
 {
     std::list<R5AsmStrangeFake> k;
     for (auto& c : b) {
-        if (c.fakeOP != ADDI && c.fakeOP != ADDIW) {
+        if (c.fakeOP != ADDI && c.fakeOP != ADDIW && c.fakeOP != MV) {
             k.push_back(c);
             continue;
         }
@@ -28,6 +28,7 @@ void R5Opt::delAdd0(vector<R5AsmStrangeFake>& b)
             k.push_back(c);
             continue;
         }
+        if (c.fakeOP == MV) { continue; }
         if ((!c.operands[2]->isLai()) && (!c.operands[2]->isLai64())) {
             k.push_back(c);
             continue;
