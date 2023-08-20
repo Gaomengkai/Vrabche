@@ -99,14 +99,6 @@ void IROptInline::run()
             std::cout << "Inline ing function: " << f->getName() << std::endl;
             break;   // inline one func at a time
         }
-        std::cout << "1 pass ends" << std::endl;
-        for (auto f : _irast->funcDefs) {
-            for (auto b : f->getBasicBlocks()) {
-                std::cout << "Function: " << f->getName() << std::endl;
-                std::cout << "block: " << b->getName() << std::endl;
-                std::cout << printBB(b) << std::endl;
-            }
-        }
     } while (!canInlineFuncs.empty());
 }
 

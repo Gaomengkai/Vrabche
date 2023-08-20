@@ -72,7 +72,7 @@ public:
             for (auto i = 0; i < _optimizers.size(); i++) {
                 auto& optimizer = _optimizers[i];
                 optimizer->run();
-                LOGW("Opt " << i << "done. Has changed: " << optimizer->hasChanged);
+                // LOGW("Opt " << i << "done. Has changed: " << optimizer->hasChanged);
                 hasChanged |= optimizer->hasChanged;
             }
         } while (hasChanged);
@@ -96,7 +96,7 @@ public:
                 // }
                 auto& optimizer = _optimizers[i];
                 optimizer->run();
-                LOGW("Opt " << i << "done. Has changed: " << optimizer->hasChanged);
+                // LOGW("Opt " << i << "done. Has changed: " << optimizer->hasChanged);
                 hasChanged |= optimizer->hasChanged;
                 // if (i == pause) {
                 //     auto after  = std::ofstream("../testsrc/"+std::to_string(tcnt)+"after.txt");
