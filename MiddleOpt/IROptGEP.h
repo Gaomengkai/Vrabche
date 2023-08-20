@@ -13,7 +13,7 @@
 namespace MiddleIR::Optimizer{
     template<typename T>
     using SP = shared_ptr<T>;
-
+    static int  gep_TempVarNum = 0;
 
 
     class IROptGEP : public IROptimizerBase
@@ -23,11 +23,9 @@ namespace MiddleIR::Optimizer{
         ~IROptGEP() override = default;
         void        run() override;
         bool runOnBB(const shared_ptr<MiddleIRBasicBlock>& bb);
-        inline string G(){
-            return "%g" + std::to_string(TempVarNum++);
+        static inline string G(){
+            return "%g" + std::to_string(gep_TempVarNum++);
         }
-    protected:
-        int TempVarNum = 0;
     };
 
 

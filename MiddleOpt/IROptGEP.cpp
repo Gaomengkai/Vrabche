@@ -38,8 +38,11 @@ bool MiddleIR::Optimizer::IROptGEP::runOnBB(const shared_ptr<MiddleIRBasicBlock>
                 changed = true;
                 auto added = i->getIndex()[i->getIndex().size() - 1];
 
+                auto prototype = i->getType1();
                 auto type1 = i->getType1();
                 auto from  = i->getFrom();
+
+
                 for (int j = 0; j < i->getIndex().size() - 1; j++) {
                     int64_t curShapeSizeBytes = 0;
                     if (auto aType1 = std::dynamic_pointer_cast<ArrayType>(type1)) {
@@ -50,37 +53,29 @@ bool MiddleIR::Optimizer::IROptGEP::runOnBB(const shared_ptr<MiddleIRBasicBlock>
                     }
                     //先算出偏移量
                     auto mul_ = make_shared<IMathInst>(IMathInst::IMathOp::MUL, make_shared<IntType>(32), i->getIndex()[j], IR_INT_CONST(curShapeSizeBytes));
-                    auto ul_1 = mul_->getUseList();
-                    *ul_1[0] = i->getIndex()[j];
-                    *ul_1[1] = IR_INT_CONST(curShapeSizeBytes);
                     mul_->setName(G());
                     newInsts.push_back(mul_);
 
                     //再加到added上
                     auto add_ = make_shared<IMathInst>(IMathInst::IMathOp::ADD, make_shared<IntType>(32), mul_, added);
-                    auto ul_2 = add_->getUseList();
-                    *ul_2[0] = mul_;
-                    *ul_2[1] = added;
                     add_->setName(G());
                     newInsts.push_back(add_);
                     added = add_;
+                }
 
+                while (type1->isArray()) {
+                    type1 = std::dynamic_pointer_cast<ArrayType>(type1)->getElementType();
                 }
 
                 //接下来bitcast
-                auto bitcast_ = make_shared<BitCastInst>(type1, from, makePointer(make_shared<IntType>(32)));
-                auto ul_3 = bitcast_->getUseList();
-                *ul_3[0] = from;
+                auto bitcast_ = make_shared<BitCastInst>(prototype, from, makePointer(type1));
                 bitcast_->setName(G());
                 newInsts.push_back(bitcast_);
 
                 //最后getelementptr
                 vector<shared_ptr<MiddleIRVal>> index_;
                 index_.emplace_back(added);
-                auto getelementptr_ = make_shared<GetElementPtrInst>(make_shared<IntType>(32),makePointer(make_shared<IntType>(32)), bitcast_, index_);
-                auto ul_4 = getelementptr_->getUseList();
-                *ul_4[0] = bitcast_;
-                *ul_4[1] = added;
+                auto getelementptr_ = make_shared<GetElementPtrInst>(make_shared<IntType>(32),makePointer(type1), bitcast_, index_);
                 getelementptr_->setName(i->getName());
                 newInsts.push_back(getelementptr_);
             }
