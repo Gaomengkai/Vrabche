@@ -117,7 +117,7 @@ public:
     [[nodiscard]] std::vector<shared_ptr<MiddleIRVal>*> getUseList() const { return _useList; }
 
 
-protected:
+public:
     std::vector<shared_ptr<MiddleIRVal>*> _useList;
     bool                                  _deleted = false;
 
@@ -584,7 +584,7 @@ public:
     [[nodiscard]] const vector<shared_ptr<MiddleIRVal>>& getIndex() const { return _index; }
     [[nodiscard]] const SPType&                          getType1() const { return _type1; }
 
-protected:
+//protected:
     SPType                          _fromType;
     std::shared_ptr<MiddleIRVal>    _from;
     vector<shared_ptr<MiddleIRVal>> _index;

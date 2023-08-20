@@ -30,8 +30,8 @@ bool MiddleIR::Optimizer::IROptGEP::runOnBB(const shared_ptr<MiddleIRBasicBlock>
             //%g4 = bitcast [500 x i32]* %v90 to i32*
             //%v91 = getelementptr i32, i32* %g4, i32 %g3
             auto i = DPC(GetElementPtrInst, inst);
-            if (i->getIndex().size() == 1) {
-                IR_ASSERT(i->getIndex().size() < 1, "getElementPtrInst's index size must be greater than 1");
+            if (i->getIndex().size() <= 1) {
+                IR_ASSERT(i->getIndex().size() == 1, "getElementPtrInst's index size must be greater than 1");
                 newInsts.push_back(inst);
                 continue;
             }
@@ -74,11 +74,15 @@ bool MiddleIR::Optimizer::IROptGEP::runOnBB(const shared_ptr<MiddleIRBasicBlock>
                 newInsts.push_back(bitcast_);
 
                 //最后getelementptr
-                vector<shared_ptr<MiddleIRVal>> index_;
-                index_.emplace_back(added);
-                auto getelementptr_ = make_shared<GetElementPtrInst>(make_shared<IntType>(32),makePointer(type1), bitcast_, index_);
-                getelementptr_->setName(i->getName());
-                newInsts.push_back(getelementptr_);
+                i->_index.erase(i->_index.begin(), i->_index.end());
+                i->_index.push_back(added);
+                i->_type1 = type1;
+                i->_from = bitcast_;
+                i->_fromType = makePointer(type1);
+                i->_useList.erase(i->_useList.begin(), i->_useList.end());
+                i->_useList.emplace_back(&i->_from);
+                i->_useList.emplace_back(&i->_index[0]);
+                newInsts.push_back(i);
             }
 
         }
