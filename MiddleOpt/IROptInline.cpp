@@ -96,7 +96,7 @@ void IROptInline::run()
                     break;
                 }
             }
-            std::cout << "Inline ing function: " << f->getName() << std::endl;
+            // std::cout << "Inline ing function: " << f->getName() << std::endl;
             break;   // inline one func at a time
         }
     } while (!canInlineFuncs.empty());
@@ -132,7 +132,7 @@ void IROptInline::inlineSimpleFunc(const SPFDef& toInlineF)
         oriRetInst = DPC(ReturnInst, b->getTerminator());
     }
     for (const auto& f : _irast->funcDefs) {
-        LOGW("func: " << f->getName());
+        // LOGW("func: " << f->getName());
         for (auto b : f->getBasicBlocks()) {
             bool needContinue;
             do {

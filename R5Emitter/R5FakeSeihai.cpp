@@ -10,6 +10,7 @@
 #include "R5Lai64.h"
 #include "R5RegAllocator.h"
 #include "R5Utils.h"
+#include "R5Opt.h"
 
 #define SP std::shared_ptr
 namespace R5Emitter
@@ -234,6 +235,11 @@ void R5FakeSeihai::emitFakeSeihai()
     // remove NOT Callee-save regs
     for (auto& reg : totalUsedRegRes) {
         if (R5Yang::isCalleeSave(reg)) { totalUsedReg.insert(reg); }
+    }
+    // 这里，我们搞一点小优化！
+    Opt::R5Opt o;
+    for(auto & code : allocatedCodes) {
+        R5Emitter::Opt::R5Opt::runOnBB(code);
     }
 
     // 处理返回语句。我的方法是新建立一个funcRetLabel()标签(基本块)，
