@@ -30,7 +30,8 @@ bool MiddleIR::Optimizer::IROptGEP::runOnBB(const shared_ptr<MiddleIRBasicBlock>
             //%g4 = bitcast [500 x i32]* %v90 to i32*
             //%v91 = getelementptr i32, i32* %g4, i32 %g3
             auto i = DPC(GetElementPtrInst, inst);
-            if (i->getIndex().size() <= 2) {
+            if (i->getIndex().size() == 1) {
+                IR_ASSERT(i->getIndex().size() < 1, "getElementPtrInst's index size must be greater than 1");
                 newInsts.push_back(inst);
                 continue;
             }
