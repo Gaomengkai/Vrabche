@@ -109,12 +109,12 @@ public:
             }
             tcnt++;
         } while (hasChanged);
-        auto after = std::ofstream("../testsrc/allafter.txt");
-        for (const auto& f : _irast->funcDefs) {
-            after << "FUNC " << f->getName() << std::endl;
-            for (auto& b : f->getBasicBlocks()) { after << printBB(b) << std::endl; }
-        }
-        after.close();
+        // auto after = std::ofstream("../testsrc/allafter.txt");
+        // for (const auto& f : _irast->funcDefs) {
+        //     after << "FUNC " << f->getName() << std::endl;
+        //     for (auto& b : f->getBasicBlocks()) { after << printBB(b) << std::endl; }
+        // }
+        // after.close();
     }
 
 protected:
