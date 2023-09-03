@@ -116,6 +116,13 @@ private:
                      YangReg                     st,
                      YangReg                     tmp
                  );
+    R5AsmStrangeFake quickMulInm(
+        vector<R5AsmStrangeFake>& sf,
+        shared_ptr<R5Taichi>      lv,
+        shared_ptr<R5Taichi>      rv,
+        int64_t                   inm,
+        bool                      is64
+    );
 };
 
 }   // namespace R5Emitter

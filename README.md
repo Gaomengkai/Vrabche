@@ -7,9 +7,10 @@
 
 - [x] lex & parser
 - [x] code generation
-- [x] RISC-V backend
+- [x] RISC-V (rv64gc) backend
 - [ ] ARMv7ve backend
-- [ ] optimization
+- [x] optimization (IR, partial)
+- [ ] optimization (RVBE)
 
 ## Usage
 

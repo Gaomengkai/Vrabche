@@ -10,6 +10,7 @@
 #include "R5Lai64.h"
 #include "R5RegAllocator.h"
 #include "R5Utils.h"
+#include "R5Opt.h"
 
 #define SP std::shared_ptr
 namespace R5Emitter
@@ -235,6 +236,9 @@ void R5FakeSeihai::emitFakeSeihai()
     for (auto& reg : totalUsedRegRes) {
         if (R5Yang::isCalleeSave(reg)) { totalUsedReg.insert(reg); }
     }
+    // 这里，我们搞一点小优化！
+    Opt::R5Opt o;
+    for (auto& code : allocatedCodes) { R5Emitter::Opt::R5Opt::runOnBB(code); }
 
     // 处理返回语句。我的方法是新建立一个funcRetLabel()标签(基本块)，
     // 然后在每个函数的最后一条指令之后插入一条J指令，跳转到。
@@ -551,6 +555,41 @@ void R5FakeSeihai::handleCallInst(
         }
     }
 }
+R5AsmStrangeFake R5FakeSeihai::quickMulInm(
+    vector<R5AsmStrangeFake>& sf,
+    std::shared_ptr<R5Taichi> lv,
+    std::shared_ptr<R5Taichi> rv,
+    int64_t                   inm,
+    bool                      is64
+)
+{
+    const static int64_t x2[] = {
+        1,        2,        4,        8,         16,        32,        64,        128,
+        256,      512,      1024,     2048,      4096,      8192,      16384,     32768,
+        65536,    131072,   262144,   524288,    1048576,   2097152,   4194304,   8388608,
+        16777216, 33554432, 67108864, 134217728, 268435456, 536870912, 1073741824};
+    bool canQuickMul = false;
+    int  inmIdx      = 0;
+    for (int i = 0; i < sizeof(x2) / sizeof(x2[0]); ++i) {
+        if (x2[i] == inm) {
+            canQuickMul = true;
+            inmIdx      = i;
+            break;
+        }
+    }
+    auto op = is64 ? MUL : MULW;
+    if (canQuickMul) {
+        if (inmIdx == 0) {
+            return R5AsmStrangeFake(MV, {lv, rv});
+        } else {
+            return R5AsmStrangeFake(SLL, {lv, rv, N(inmIdx)});
+        }
+    } else {
+        auto tmp = V(E(), is64 ? Pointer : Int);
+        sf.emplace_back(R5AsmStrangeFake(LI, {tmp, N((int)inm)}));
+        return R5AsmStrangeFake(op, {lv, rv, tmp});
+    }
+}
 void R5FakeSeihai::handleGEPInst(
     vector<R5AsmStrangeFake>& sf, const shared_ptr<MiddleIRInst>& inst1
 )
@@ -607,11 +646,14 @@ void R5FakeSeihai::handleGEPInst(
             } else {
                 // 前面的不是立即数，那就先乘以类型大小，然后再加上立即数。
                 // tmp2=idx*curShapeSizeBytes; tmp1=tmp2+offset;
+                // 草，加0就别加了。
                 uint64_t tmp2 =
                     std::dynamic_pointer_cast<R5IRValConstInt>(idx)->getValue() * curShapeSizeBytes;
-                auto tmp3 = V(E(), Pointer);
-                sf.emplace_back(R5AsmStrangeFake(LI, {tmp3, P(tmp2)}));
-                sf.emplace_back(R5AsmStrangeFake(ADD, {tmp, tmp, tmp3}));
+                if (tmp2 != 0) {
+                    auto tmp3 = V(E(), Pointer);
+                    sf.emplace_back(R5AsmStrangeFake(LI, {tmp3, P(tmp2)}));
+                    sf.emplace_back(R5AsmStrangeFake(ADD, {tmp, tmp, tmp3}));
+                }
             }
         } else {
             if (immSoFar) {
@@ -619,24 +661,37 @@ void R5FakeSeihai::handleGEPInst(
                 // 把之前的结果先存到寄存器中，然后再加上这个变量*类型大小。
                 // tmp1=tmp+offset; tmp2=tmp1+idx*curShapeSizeBytes;
                 const std::shared_ptr<R5Taichi>& tmp2 = V(E(), Pointer);
+                auto m = quickMulInm(sf, tmp2, V(idx->getName(), Pointer), curShapeSizeBytes, true);
+                sf.emplace_back(m);
                 // li
-                sf.emplace_back(R5AsmStrangeFake(LI, {tmp2, P(curShapeSizeBytes)}));
-                sf.emplace_back(R5AsmStrangeFake(MUL, {tmp2, V(idx->getName(), Int), tmp2}));
-                // li offset
-                auto tmp4 = V(E(), Pointer);
-                sf.emplace_back(R5AsmStrangeFake(LI, {tmp4, P(offset)}));
-                // add
-                tmp = V(E(), Pointer);
-                sf.emplace_back(R5AsmStrangeFake(ADD, {tmp4, tmp4, tmp2}));
-                sf.emplace_back(R5AsmStrangeFake(ADD, {tmp, tmp4, base}));
+                // sf.emplace_back(R5AsmStrangeFake(LI, {tmp2, P(curShapeSizeBytes)}));
+                // sf.emplace_back(R5AsmStrangeFake(MUL, {tmp2, V(idx->getName(), Int), tmp2}));
+                if (offset != 0) {
+                    // li offset
+                    auto tmp4 = V(E(), Pointer);
+                    tmp       = V(E(), Pointer);
+                    if (couldLoadWithRegImm(offset)) {
+                        sf.emplace_back(R5AsmStrangeFake(ADDI, {tmp4, tmp2, P(offset)}));
+                    } else {
+                        sf.emplace_back(R5AsmStrangeFake(LI, {tmp4, P(offset)}));
+                        // add
+                        sf.emplace_back(R5AsmStrangeFake(ADD, {tmp4, tmp4, tmp2}));
+                    }
+                    sf.emplace_back(R5AsmStrangeFake(ADD, {tmp, tmp4, base}));
+                } else {
+                    tmp = V(E(), Pointer);
+                    sf.emplace_back(R5AsmStrangeFake(ADD, {tmp, tmp2, base}));
+                }
             } else {
-                // tmp1=tmp+offset; tmp2=tmp1+idx*curShapeSizeBytes;
-                const std::shared_ptr<R5Taichi>& tmp2 = V(E(), Pointer);
-                // li
-                sf.emplace_back(R5AsmStrangeFake(LI, {tmp2, P(curShapeSizeBytes)}));
-                // mul
                 const std::shared_ptr<R5Taichi>& tmp3 = V(E(), Pointer);
-                sf.emplace_back(R5AsmStrangeFake(MUL, {tmp3, V(idx->getName(), Pointer), tmp2}));
+                auto m = quickMulInm(sf, tmp3, V(idx->getName(), Pointer), curShapeSizeBytes, true);
+                sf.emplace_back(m);
+                // // tmp1=tmp+offset; tmp2=tmp1+idx*curShapeSizeBytes;
+                // const std::shared_ptr<R5Taichi>& tmp2 = V(E(), Pointer);
+                // // li
+                // sf.emplace_back(R5AsmStrangeFake(LI, {tmp2, P(curShapeSizeBytes)}));
+                // // mul
+                // sf.emplace_back(R5AsmStrangeFake(MUL, {tmp3, V(idx->getName(), Pointer), tmp2}));
                 // add
                 sf.emplace_back(R5AsmStrangeFake(ADD, {tmp, tmp, tmp3}));
             }
@@ -787,7 +842,12 @@ void R5FakeSeihai::handleBitcastInst(
             sf.emplace_back(R5AsmStrangeFake(ADD, {V(to, Pointer), R(s0), tmp}));
         }
     } else {
-        sf.emplace_back(R5AsmStrangeFake(MV, {V(to, Pointer), V(from, Pointer)}));
+        auto op = MV;
+        if (from[0] == '@') {
+            op   = LLA;
+            from = from.substr(1);
+        }
+        sf.emplace_back(R5AsmStrangeFake(op, {V(to, Pointer), V(from, Pointer)}));
     }
 }
 void R5FakeSeihai::handleCvtInst(
@@ -1201,7 +1261,7 @@ void R5FakeSeihai::handleIMathInst(
     if (op1->isConst())
         taichi1 = N(std::dynamic_pointer_cast<R5IRValConstInt>(op1)->getValue());   // const LAI
     else
-        taichi1 = V(op1->getName(), Int);                                           // var YIN
+        taichi1 = V(op1->getName(), Int);   // var YIN
     auto op2 = math->getOpVal2();
     if (op2->isConst())
         taichi2 = N(std::dynamic_pointer_cast<R5IRValConstInt>(op2)->getValue());

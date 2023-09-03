@@ -131,6 +131,6 @@ void IROptDCE1::run()
         // 结果：
         //        std::cout << bb->_instructions.size() << std::endl;
     }
-    LOGW("DCE1 Done");
+    // LOGW("DCE1 Done");
 }
 }   // namespace MiddleIR::Optimizer

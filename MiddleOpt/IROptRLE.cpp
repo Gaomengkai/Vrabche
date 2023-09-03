@@ -103,7 +103,7 @@ void IROptRLE::run()
             // end
         }
     }
-    LOGW("RLE Done");
+    // LOGW("RLE Done");
 }
 
 }   // namespace MiddleIR::Optimizer

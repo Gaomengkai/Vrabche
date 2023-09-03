@@ -22,6 +22,19 @@ inline string printConst(shared_ptr<R5IRValConst> c)
     }
     return "UNKNOWN CONST";
 }
+inline string iMathOpToStr(IMathInst::IMathOp op)
+{
+    switch (op) {
+    case IMathInst::IMathOp::ADD: return "ADD";
+    case IMathInst::IMathOp::SUB: return "SUB";
+    case IMathInst::IMathOp::MUL: return "MUL";
+    case IMathInst::IMathOp::SDIV: return "SDIV";
+    case IMathInst::IMathOp::SREM: return "SREM";
+    case IMathInst::IMathOp::UDIV: return "UDIV";
+    case IMathInst::IMathOp::UREM: return "UREM";
+    }
+    return "IMATH";
+}
 inline string printInst(const shared_ptr<MiddleIRInst>& sharedPtr)
 {
     string instName;
@@ -29,14 +42,29 @@ inline string printInst(const shared_ptr<MiddleIRInst>& sharedPtr)
     case MiddleIRInst::AllocaInst: instName = "ALLOCA"; break;
     case MiddleIRInst::ReturnInst: instName = "RETURN"; break;
     case MiddleIRInst::BrInst: instName = "BR"; break;
-    case MiddleIRInst::IMathInst: instName = "IMATH"; break;
+    case MiddleIRInst::IMathInst: {
+        auto math = std::static_pointer_cast<IMathInst>(sharedPtr)->iMathOp;
+        instName  = iMathOpToStr(math);
+    } break;
     case MiddleIRInst::FMathInst: instName = "FMATH"; break;
     case MiddleIRInst::ICmpInst: instName = "ICMP"; break;
     case MiddleIRInst::FCmpInst: instName = "FCMP"; break;
     case MiddleIRInst::LoadInst: instName = "LOAD"; break;
     case MiddleIRInst::StoreInst: instName = "STORE"; break;
     case MiddleIRInst::BitCastInst: instName = "BITCAST"; break;
-    case MiddleIRInst::GetElementPtrInst: instName = "GETELEMENTPTR"; break;
+    case MiddleIRInst::GetElementPtrInst: {
+        auto gep = std::static_pointer_cast<GetElementPtrInst>(sharedPtr);
+        instName = gep->getName() + " = GETELEMENTPTR " + gep->_from->getName() + ", offset = ";
+        for (const auto& t : gep->_index) {
+            if (t->isConst()) {
+                instName += printConst(std::static_pointer_cast<R5IRValConst>(t));
+            } else {
+                instName += t->getName();
+            }
+            instName += ", ";
+        }
+        return instName;
+    } break;
     case MiddleIRInst::ConvertInst: instName = "CONVERT"; break;
     case MiddleIRInst::CallInst:
         instName = "CALL" + DPC(CallInst, sharedPtr)->getFunc()->getName();

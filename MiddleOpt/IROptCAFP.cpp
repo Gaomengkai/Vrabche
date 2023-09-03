@@ -115,6 +115,6 @@ void IROptCAFP::run()
         }
     }
     // end
-    LOGW("CAFP done");
+    // LOGW("CAFP done");
 }
 }   // namespace MiddleIR::Optimizer
